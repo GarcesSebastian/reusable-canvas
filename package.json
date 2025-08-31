@@ -1,9 +1,10 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "reusable-canvas",
-  "version": "1.0.1",
+  "name": "reusable-canvas-preview",
+  "version": "1.0.0",
   "description": "Reusable canvas library for creating interactive shapes",
   "main": "./dist/index.js",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
@@ -14,6 +15,7 @@
   "files": [
     "dist/**/*"
   ],
+  "sideEffects": false,
   "scripts": {
     "build": "npx tsc --project ./tsconfig.json",
     "prepublishOnly": "npm run build",

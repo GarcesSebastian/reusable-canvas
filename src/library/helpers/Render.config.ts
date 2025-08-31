@@ -17,13 +17,13 @@ export interface Keys {
 }
 
 export interface RenderConfigurationProps {
-    history: boolean,
-    pan: boolean,
-    zoom: boolean,
-    select: boolean,
-    resize: boolean,
-    transform: boolean,
-    keywords: Keys   
+    history?: boolean,
+    pan?: boolean,
+    zoom?: boolean,
+    select?: boolean,
+    resize?: boolean,
+    transform?: boolean,
+    keywords?: Keys   
 }
 
 export type RenderKeywords = Record<string, string[]> // -> { [key: string]: string[] } --> { "copy": ["ctrl", "c"] }
@@ -73,7 +73,7 @@ export class RenderConfiguration {
     }
 
     private setup(): void {
-        Object.entries(this._config.keywords).forEach(([key, value]) => {
+        Object.entries(this._config.keywords ?? {}).forEach(([key, value]) => {
             this._keywords[key] = value.split("+");
         });
         document.removeEventListener("keydown", this._handleKeyDown);

@@ -64,6 +64,9 @@ export abstract class Shape extends ShapeProvider {
 
         this._render = render;
         this._render.manager.addChild(this);
+
+        if (this.zIndex > this._render._maxZIndex) this._render._maxZIndex = this.zIndex;
+        if (this.zIndex < this._render._minZIndex) this._render._minZIndex = this.zIndex;
     }
 
     /**
@@ -111,6 +114,28 @@ export abstract class Shape extends ShapeProvider {
      * @returns `true` if this shape overlaps the boundary area, otherwise `false`.
      */
     public abstract _isShapeInBoundary(boundaryX: number, boundaryY: number, boundaryWidth: number, boundaryHeight: number): boolean;
+
+    public setTop(): Shape {
+        this.zIndex += 1;
+        return this;
+    }
+
+    public setBottom(): Shape {
+        this.zIndex -= 1;
+        return this;
+    }
+
+    public setFront(): Shape {
+        this._render._maxZIndex += 1;
+        this.zIndex = this._render._maxZIndex;
+        return this;
+    }
+
+    public setBack(): Shape {
+        this._render._minZIndex -= 1;
+        this.zIndex = this._render._minZIndex;
+        return this;
+    }
 
     /**
      * Draws the shape on the canvas.

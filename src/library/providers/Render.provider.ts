@@ -38,6 +38,18 @@ export class RenderProvider {
     public on(event: "mousedown", callback: ListenerCallback<"mousedown">): void;
     public on(event: "mouseup", callback: ListenerCallback<"mouseup">): void;
     public on(event: "create", callback: ListenerCallback<"create">): void;
+    public on(event: "undo", callback: ListenerCallback<"undo">): void;
+    public on(event: "redo", callback: ListenerCallback<"redo">): void;
+    public on(event: "save", callback: ListenerCallback<"save">): void;
+    public on(event: "copy", callback: ListenerCallback<"copy">): void;
+    public on(event: "cut", callback: ListenerCallback<"cut">): void;
+    public on(event: "paste", callback: ListenerCallback<"paste">): void;
+    public on(event: "delete", callback: ListenerCallback<"delete">): void;
+    public on(event: "selectAll", callback: ListenerCallback<"selectAll">): void;
+    public on(event: "top", callback: ListenerCallback<"top">): void;
+    public on(event: "bottom", callback: ListenerCallback<"bottom">): void;
+    public on(event: "front", callback: ListenerCallback<"front">): void;
+    public on(event: "back", callback: ListenerCallback<"back">): void;
 
     /**
      * Registers an event listener for the specified event type
