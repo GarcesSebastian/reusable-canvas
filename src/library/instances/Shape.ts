@@ -182,7 +182,7 @@ export abstract class Shape extends ShapeProvider {
      * and detaches it from any active transformer.
      */
     public destroy() : void {
-        this.emit("destroy");
+        this.emit("destroy", {});
         this._render.manager.removeChild(this);
     }
 }

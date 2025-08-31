@@ -4,8 +4,8 @@ import type { Render } from "../Render";
 
 export type RenderEventTemplate = {
     pointer: {
-        relative: Vector;
         absolute: Vector;
+        world: Vector;
     },
     target: Shape | Render;
 }

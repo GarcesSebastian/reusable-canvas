@@ -2,7 +2,7 @@ import type { Vector } from "../instances/common/Vector";
 
 export type ShapeType = "circle" | "rect";
 
-export interface ShapeRawData {
+export type ShapeRawData = {
     id: string;
     type: ShapeType;
     position: Vector;
@@ -12,12 +12,12 @@ export interface ShapeRawData {
     visible: boolean;
 }
 
-export interface CircleRawData extends ShapeRawData {
+export type CircleRawData = ShapeRawData & {
     radius: number;
     color: string;
 }
 
-export interface RectRawData extends ShapeRawData {
+export type RectRawData = ShapeRawData & {
     width: number;
     height: number;
     color: string;

@@ -2,7 +2,7 @@ import { Circle as _Circle } from "../instances/_shapes/Circle";
 import { Vector as _Vector } from "../instances/common/Vector";
 import { Render } from "../Render";
 import { Rect as _Rect } from "../instances/_shapes/Rect";
-import type { CircleProps, RectProps } from "../types/Shape";
+import type { CircleProps, RectProps as _RectProps } from "../types/Shape";
 
 /**
  * Factory class for creating shapes and utility objects within a render context
@@ -24,7 +24,7 @@ export class RenderCreator {
      * @param props - Configuration properties for the rectangle
      * @returns A new Rect instance
      */
-    public Rect(props: RectProps): _Rect {
+    public Rect(props: _RectProps): _Rect {
         const rect = new _Rect(props, this._render);
         this._render.emit("create", { shape: rect })
         return rect;

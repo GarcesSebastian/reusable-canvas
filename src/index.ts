@@ -1,27 +1,14 @@
-// Main classes
+// Clases ejecutables
 export { Render } from "./library/Render";
-
-// Shape classes
+export { RenderCreator } from "./library/helpers/Render.creator";
 export { Circle } from "./library/instances/_shapes/Circle";
 export { Rect } from "./library/instances/_shapes/Rect";
-
-// Utility classes
 export { Vector } from "./library/instances/common/Vector";
 
-// Type definitions
+// Tipos
+export type { CircleProps, RectProps, ShapeProps } from "./library/types/Shape";
+export type { CircleRawData, RectRawData, ShapeRawData } from "./library/types/Raw";
 export type { 
-    CircleProps, 
-    RectProps, 
-    ShapeProps 
-} from "./library/types/Shape";
-
-export type { 
-    CircleRawData, 
-    RectRawData, 
-    ShapeRawData 
-} from "./library/types/Raw";
-
-export type {
     RenderEventsType,
     RenderEventMap,
     ListenerCallback,
@@ -31,9 +18,8 @@ export type {
     RenderEventMouseMove,
     RenderEventMouseUp,
     RenderEventCreate
-} from "./library/types/RenderProvider";
-
-export type {
+ } from "./library/types/RenderProvider";
+export type { 
     ShapeEventsType,
     ShapeEventsMap,
     ShapeListenerCallback,
@@ -43,4 +29,4 @@ export type {
     ShapeEventDragEnd,
     ShapeEventDragStart,
     ShapeEventDestroy
-} from "./library/types/ShapeProvider";
+ } from "./library/types/ShapeProvider";

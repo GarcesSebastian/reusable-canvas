@@ -1,6 +1,6 @@
 import type { Vector } from "../instances/common/Vector";
 
-export interface ShapeProps {
+export type ShapeProps = {
     dragging?: boolean;
     position: Vector;
     zIndex?: number;
@@ -8,12 +8,12 @@ export interface ShapeProps {
     visible?: boolean;
 }
 
-export interface CircleProps extends ShapeProps {
+export type CircleProps = ShapeProps & {
     radius: number;
     color?: string;
 }
 
-export interface RectProps extends ShapeProps {
+export type RectProps = ShapeProps & {
     width: number;
     height: number;
     color?: string;

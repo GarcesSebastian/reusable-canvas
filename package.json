@@ -1,11 +1,10 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "reusable-canvas-preview",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Reusable canvas library for creating interactive shapes",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

@@ -13,7 +13,7 @@ export type ShapeEventClick = ShapeEventTemplate;
 export type ShapeEventDragStart = ShapeEventTemplate;
 export type ShapeEventDragEnd = ShapeEventTemplate;
 export type ShapeEventDrag = ShapeEventTemplate;
-export type ShapeEventDestroy = ShapeEventTemplate;
+export type ShapeEventDestroy = {};
 
 export type ShapeEventsMap = {
     "click": ShapeEventClick;
@@ -24,4 +24,4 @@ export type ShapeEventsMap = {
 }
 
 export type ShapeEventsType = keyof ShapeEventsMap;
-export type ShapeListenerCallback<T extends ShapeEventsType> = (args?: ShapeEventsMap[T]) => void;
+export type ShapeListenerCallback<T extends ShapeEventsType> = (args: ShapeEventsMap[T]) => void;
