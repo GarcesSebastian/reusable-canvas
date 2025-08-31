@@ -1,0 +1,44 @@
+{
+  "name": "reusable-canvas-test",
+  "version": "1.0.0",
+  "description": "Reusable canvas library for creating interactive shapes",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist/**/*"
+  ],
+  "scripts": {
+    "build": "npx tsc --project ./tsconfig.json",
+    "prepublishOnly": "npm run build",
+    "release:patch": "npm run build && npm version patch && npm publish --tag patch",
+    "release:minor": "npm run build && npm version minor && npm publish --tag minor",
+    "release:major": "npm run build && npm version major && npm publish --tag major",
+    "release:beta": "npm run build && npm version prerelease --preid=beta && npm publish --tag beta",
+    "release:alpha": "npm run build && npm version prerelease --preid=alpha && npm publish --tag alpha"
+  },
+  "keywords": [
+    "canvas",
+    "typescript",
+    "graphics",
+    "shapes"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "@types/uuid": "^9.0.0"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}
