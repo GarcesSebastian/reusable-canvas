@@ -75,7 +75,7 @@ export class Rect extends Shape {
      * @returns `true` if the point is inside the rectangle's bounds, otherwise `false`.
      */
     public _isClicked() : boolean {
-        const mouseVector = this._render.mousePositionRelative();
+        const mouseVector = this._render.worldPosition();
         
         if (this.rotation === 0) {
             return mouseVector.x >= this.position.x && 

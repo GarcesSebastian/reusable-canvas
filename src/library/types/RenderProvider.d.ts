@@ -10,6 +10,8 @@ export type RenderEventTemplate = {
     target: Shape | Render;
 }
 
+export type RenderEventBlank = {}
+
 export type RenderEventClick = RenderEventTemplate;
 export type RenderEventMouseMove = RenderEventTemplate;
 export type RenderEventMouseDown = RenderEventTemplate;
@@ -22,6 +24,18 @@ export type RenderEventMap = {
     "mousedown": RenderEventMouseDown;
     "mouseup": RenderEventMouseUp;
     "create": RenderEventCreate;
+    "undo": RenderEventBlank;
+    "redo": RenderEventBlank;
+    "save": RenderEventBlank;
+    "copy": RenderEventBlank;
+    "cut": RenderEventBlank;
+    "paste": RenderEventBlank;
+    "delete": RenderEventBlank;
+    "selectAll": RenderEventBlank;
+    "top": RenderEventBlank;
+    "bottom": RenderEventBlank;
+    "front": RenderEventBlank;
+    "back": RenderEventBlank;
 }
 
 export type RenderEventsType = keyof RenderEventMap;

@@ -13,7 +13,19 @@ export class RenderProvider {
         "mousemove": [],
         "mousedown": [],
         "mouseup": [],
-        "create": []
+        "create": [],
+        "undo": [],
+        "redo": [],
+        "save": [],
+        "copy": [],
+        "cut": [],
+        "paste": [],
+        "delete": [],
+        "selectAll": [],
+        "top": [],
+        "bottom": [],
+        "front": [],
+        "back": [],
     };
 
     /**

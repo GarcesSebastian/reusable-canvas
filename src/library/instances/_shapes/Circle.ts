@@ -49,11 +49,14 @@ export class Circle extends Shape {
      */
     public draw() : void {
         if (!this.visible) return;
+        this._ctx.save();
+        this._ctx.translate(this.position.x, this.position.y);
         this._ctx.beginPath();
-        this._ctx.arc(this.position.x, this.position.y, this.radius, 0, Math.PI * 2);
+        this._ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
         this._ctx.fillStyle = this.color;
         this._ctx.fill();
         this._ctx.closePath();
+        this._ctx.restore();
     }
 
     /**
@@ -94,9 +97,9 @@ export class Circle extends Shape {
      * @returns `true` if the distance is less than or equal to the radius, otherwise `false`.
      */
     public _isClicked() : boolean {
-        const mouseVector = this._render.mousePositionRelative();
+        const mouseVector = this._render.worldPosition();
         const distance = mouseVector.sub(this.position).len();
-        
+
         return distance <= this.radius;
     }
 

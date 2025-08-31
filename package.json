@@ -1,5 +1,6 @@
 {
-  "name": "reusable-canvas-test",
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "reusable-canvas",
   "version": "1.0.0",
   "description": "Reusable canvas library for creating interactive shapes",
   "main": "./dist/index.js",
