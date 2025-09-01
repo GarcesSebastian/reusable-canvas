@@ -22,6 +22,7 @@ export interface RenderConfigurationProps {
     zoom?: boolean,
     select?: boolean,
     resize?: boolean,
+    snap?: boolean,
     transform?: boolean,
     keywords?: Keys   
 }
@@ -41,6 +42,7 @@ export class RenderConfiguration {
             zoom: false,
             select: false,
             resize: false,
+            snap: false,
             transform: false,
             keywords: RenderConfiguration.defaultKeyWords()
         }

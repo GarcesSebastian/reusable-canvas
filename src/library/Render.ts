@@ -148,7 +148,10 @@ export class Render extends RenderProvider {
         if (this._draggingShape) {
             this._isDragging = true;
             this._lastMousePos = this.worldPosition();
-            this.snapSmart.bind(this._draggingShape);
+
+            if (this.configuration.config.snap) {
+                this.snapSmart.bind(this._draggingShape);
+            }
             return;
         }
 
@@ -169,7 +172,10 @@ export class Render extends RenderProvider {
             this._draggingShape.position.x += delta.x;
             this._draggingShape.position.y += delta.y;
             this._lastMousePos = current;
-            this.snapSmart.update();
+
+            if (this.configuration.config.snap) {
+                this.snapSmart.update();
+            }
         }
 
         if (this._isPan && this.configuration.config.pan) {
@@ -192,7 +198,10 @@ export class Render extends RenderProvider {
         this._isPan = false;
         this._draggingShape = null;
         this._lastMousePos = Vector.zero;
-        this.snapSmart.unbind();
+
+        if (this.configuration.config.snap) {
+            this.snapSmart.unbind();
+        }
     }
 
     private _onMouseClicked(): void {
@@ -271,7 +280,9 @@ export class Render extends RenderProvider {
             child.update()
         })
 
-        this.snapSmart.drawGuides()
+        if (this.configuration.config.snap) {
+            this.snapSmart.drawGuides()
+        }
 
         this.ctx.restore()
 
