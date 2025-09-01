@@ -1,8 +1,7 @@
-import { Circle as _Circle } from "../instances/_shapes/Circle";
-import { Vector as _Vector } from "../instances/common/Vector";
+import { Circle, type ICircle } from "../instances/_shapes/Circle";
+import { Vector } from "../instances/common/Vector";
 import { Render } from "../Render";
-import { Rect as _Rect } from "../instances/_shapes/Rect";
-import type { CircleProps, RectProps as _RectProps } from "../types/Shape";
+import { IRect, Rect } from "../instances/_shapes/Rect";
 
 /**
  * Factory class for creating shapes and utility objects within a render context
@@ -24,8 +23,8 @@ export class RenderCreator {
      * @param props - Configuration properties for the rectangle
      * @returns A new Rect instance
      */
-    public Rect(props: _RectProps): _Rect {
-        const rect = new _Rect(props, this._render);
+    public Rect(props: IRect): Rect {
+        const rect = new Rect(props, this._render);
         this._render.emit("create", { shape: rect })
         return rect;
     }
@@ -35,8 +34,8 @@ export class RenderCreator {
      * @param props - Configuration properties for the circle
      * @returns A new Circle instance
      */
-    public Circle(props: CircleProps): _Circle {
-        const circle = new _Circle(props, this._render);
+    public Circle(props: ICircle): Circle {
+        const circle = new Circle(props, this._render);
         this._render.emit("create", { shape: circle });
         return circle;
     }
@@ -47,7 +46,7 @@ export class RenderCreator {
      * @param y - The y component of the vector
      * @returns A new Vector instance
      */
-    public Vector(x: number, y: number): _Vector {
-        return new _Vector(x, y);
+    public Vector(x: number, y: number): Vector {
+        return new Vector(x, y);
     }
 }

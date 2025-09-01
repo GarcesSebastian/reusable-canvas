@@ -1,7 +1,14 @@
-import { Shape } from "../Shape";
+import { IShape, Shape } from "../Shape";
 import { Render } from "../../Render";
-import type { RectProps } from "../../types/Shape";
 import type { RectRawData } from "../../types/Raw";
+
+export interface IRect extends IShape {
+    width: number;
+    height: number;
+    color?: string;
+    borderWidth?: number;
+    borderColor?: string;
+}
 
 /**
  * Rectangular shape implementation for the rendering system.
@@ -39,7 +46,7 @@ export class Rect extends Shape {
      * @param props.borderColor - Border color. Defaults to "transparent".
      * @param render - The main `Render` context for drawing operations.
      */
-    public constructor(props: RectProps, render: Render, id?: string) {
+    public constructor(props: IRect, render: Render, id?: string) {
         super(props, render, id);
         this._ctx = render.ctx;
         this.width = props.width;

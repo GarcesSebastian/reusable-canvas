@@ -134,7 +134,7 @@ export class Render extends RenderProvider {
     }
 
     private _onMouseDown(event: MouseEvent): void {
-        this.emit("mousedown", this._getArgs(event, this))
+        this.emit("mousedown", this._getArgs(this))
 
         this._draggingShape = this._getChildrens().find((child: Shape) => child._isClicked()) ?? null;
 
@@ -172,11 +172,11 @@ export class Render extends RenderProvider {
             this._lastMousePos = current;
         }
 
-        this.emit("mousemove", this._getArgs(event, this))
+        this.emit("mousemove", this._getArgs(this))
     }
 
-    private _onMouseUp(event: MouseEvent): void {
-        this.emit("mouseup", this._getArgs(event, this))
+    private _onMouseUp(): void {
+        this.emit("mouseup", this._getArgs(this))
 
         this._isDragging = false;
         this._isPan = false;
@@ -184,20 +184,20 @@ export class Render extends RenderProvider {
         this._lastMousePos = Vector.zero;
     }
 
-    private _onMouseClicked(event: MouseEvent): void {
+    private _onMouseClicked(): void {
         let clicked = false
 
         this._getChildrens().forEach((child: Shape) => {
             if (!child.visible || !child._isClicked() || clicked) return
 
-            child.emit("click", this._getArgs(event, child))
+            child.emit("click", this._getArgs(child))
             clicked = true;
             return;
         })
 
         if (clicked) return
 
-        this.emit("click", this._getArgs(event, this))
+        this.emit("click", this._getArgs(this))
     }
 
     private _onContextmenu(event: MouseEvent): void {
@@ -208,7 +208,7 @@ export class Render extends RenderProvider {
         return Array.from([...this.childrens.values()]).sort((a, b) => b.zIndex - a.zIndex)
     }
 
-    private _getArgs<T>(event: MouseEvent, child: Shape | Render): T {
+    private _getArgs<T>(child: Shape | Render): T {
         return {
             pointer: {
                 absolute: this.mousePosition(),

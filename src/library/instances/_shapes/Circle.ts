@@ -1,8 +1,12 @@
-import { Shape } from "../Shape";
+import { IShape, Shape } from "../Shape";
 import { Render } from "../../Render";
 import { Vector } from "../common/Vector";
-import type { CircleProps } from "../../types/Shape";
 import type { CircleRawData } from "../../types/Raw";
+
+export interface ICircle extends IShape {
+    radius: number;
+    color?: string;
+}
 
 /**
  * Circular shape implementation for the rendering system.
@@ -31,7 +35,7 @@ export class Circle extends Shape {
      * @param props.color - Fill color of the circle. Defaults to "#fff".
      * @param render - The main `Render` context for drawing operations.
      */
-    public constructor(props: CircleProps, render: Render, id?: string) {
+    public constructor(props: ICircle, render: Render, id?: string) {
         super(props, render, id);
         this._ctx = render.ctx;
         this.radius = props.radius ?? 10;

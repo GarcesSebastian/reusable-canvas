@@ -3,8 +3,15 @@ import { Vector } from "./common/Vector";
 import { Render } from "../Render";
 import { ShapeManager } from "../managers/Shape.manager";
 import { ShapeProvider } from "../providers/Shape.provider";
-import type { ShapeProps } from '../types/Shape';
 import type { ShapeRawData } from '../types/Raw';
+
+export interface IShape {
+    position: Vector;
+    zIndex?: number;
+    rotation?: number;
+    dragging?: boolean;
+    visible?: boolean;
+}
 
 /**
  * Abstract base class for all shape primitives in the rendering system.
@@ -52,7 +59,7 @@ export abstract class Shape extends ShapeProvider {
      * @param props.visible - Initial visibility. Defaults to true.
      * @param render - The main `Render` context for drawing operations.
      */
-    public constructor(props: ShapeProps, render: Render, id?: string) {
+    public constructor(props: IShape, render: Render, id?: string) {
         super();
         this.position = props.position ?? new Vector(0, 0);
         this.zIndex = props.zIndex ?? 0;

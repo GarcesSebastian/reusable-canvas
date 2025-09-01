@@ -7,7 +7,6 @@
   "module": "./dist/index.js",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }
   },
@@ -17,6 +16,7 @@
   "sideEffects": false,
   "scripts": {
     "build": "npx tsc --project ./tsconfig.json",
+    "dev": "tsc --watch --project ./tsconfig.json",
     "prepublishOnly": "npm run build",
     "release:patch": "npm run build && npm version patch && npm publish --tag patch",
     "release:minor": "npm run build && npm version minor && npm publish --tag minor",
@@ -24,7 +24,7 @@
     "release:beta": "npm run build && npm version prerelease --preid=beta && npm publish --tag beta",
     "release:alpha": "npm run build && npm version prerelease --preid=alpha && npm publish --tag alpha"
   },
-  "keywords": [
+  "keywords": [ 
     "canvas",
     "typescript",
     "graphics",
@@ -37,8 +37,9 @@
     "uuid": "^9.0.0"
   },
   "devDependencies": {
-    "typescript": "^5.9.2",
-    "@types/uuid": "^9.0.0"
+    "@types/node": "^24.3.0",
+    "@types/uuid": "^9.0.0",
+    "typescript": "^5.9.2"
   },
   "engines": {
     "node": ">=16"

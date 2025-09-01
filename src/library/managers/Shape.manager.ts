@@ -13,4 +13,8 @@ export class ShapeManager {
     public constructor(shape: Shape) {
         this._shape = shape;
     }
+
+    public get shape() {
+        return this._shape;
+    }
 }
