@@ -54,7 +54,8 @@ export class Circle extends Shape {
     public draw() : void {
         if (!this.visible) return;
         this._ctx.save();
-        this._ctx.translate(this.position.x, this.position.y);
+        const camera = this._render.currentCamera;
+        this._ctx.translate(this.position.x - camera.offset.x, this.position.y - camera.offset.y);
         this._ctx.beginPath();
         this._ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
         this._ctx.fillStyle = this.color;
@@ -102,7 +103,8 @@ export class Circle extends Shape {
      */
     public _isClicked() : boolean {
         const mouseVector = this._render.worldPosition();
-        const distance = mouseVector.sub(this.position).len();
+        const camera = this._render.currentCamera;
+        const distance = mouseVector.sub(this.position.sub(camera.offset)).len();
 
         return distance <= this.radius;
     }

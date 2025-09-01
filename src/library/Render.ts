@@ -4,11 +4,13 @@ import { Shape } from "./instances/Shape";
 import { RenderManager } from "./managers/Render.manager";
 import { RenderProvider } from "./providers/Render.provider";
 import { RenderConfiguration, type RenderConfigurationProps } from "./helpers/Render.config";
+import { Camera } from "./instances/common/Camera";
 
 export class Render extends RenderProvider {
     public canvas: HTMLCanvasElement
     public ctx: CanvasRenderingContext2D
 
+    public currentCamera: Camera;
     public childrens: Map<string, Shape> = new Map();
     public configuration: RenderConfiguration;
 
@@ -55,6 +57,7 @@ export class Render extends RenderProvider {
         this.creator = new RenderCreator(this)
         this.manager = new RenderManager(this)
         this.configuration = new RenderConfiguration(this)
+        this.currentCamera = new Camera(this)
 
         this.setup()
         this.start()
@@ -185,19 +188,16 @@ export class Render extends RenderProvider {
     }
 
     private _onMouseClicked(): void {
-        let clicked = false
+        let clicked: Shape | null = null
 
         this._getChildrens().forEach((child: Shape) => {
             if (!child.visible || !child._isClicked() || clicked) return
 
             child.emit("click", this._getArgs(child))
-            clicked = true;
-            return;
+            clicked = child;
         })
 
-        if (clicked) return
-
-        this.emit("click", this._getArgs(this))
+        this.emit("click", this._getArgs(clicked ?? this))
     }
 
     private _onContextmenu(event: MouseEvent): void {
@@ -257,6 +257,8 @@ export class Render extends RenderProvider {
         this.ctx.translate(this._globalPosition.x, this._globalPosition.y)
         this.ctx.scale(this._zoom, this._zoom)
 
+        this.currentCamera.update()
+
         this._getChildrens().reverse().forEach((child: Shape) => {
             child.update()
         })
@@ -268,6 +270,7 @@ export class Render extends RenderProvider {
         this._showFps()
         this.ctx.restore()
 
+        this.emit("update", {})
         this._frameId = requestAnimationFrame(this._renderBound)
     }
 
@@ -293,6 +296,13 @@ export class Render extends RenderProvider {
         const x = vector.x - rect.left
         const y = vector.y - rect.top
         return new Vector((x - this._globalPosition.x) / this._zoom, (y - this._globalPosition.y) / this._zoom)
+    }
+
+    public toAbsoluteCoordinates(vector: Vector): Vector {
+        const rect = this.canvas.getBoundingClientRect()
+        const x = vector.x * this._zoom + this._globalPosition.x
+        const y = vector.y * this._zoom + this._globalPosition.y
+        return new Vector(x + rect.left, y + rect.top)
     }
 
     public pointerInWorld(pointer: Vector): boolean {

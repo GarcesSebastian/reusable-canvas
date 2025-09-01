@@ -36,6 +36,7 @@ export type RenderEventMap = {
     "bottom": RenderEventBlank;
     "front": RenderEventBlank;
     "back": RenderEventBlank;
+    "update": RenderEventBlank;
 }
 
 export type RenderEventsType = keyof RenderEventMap;

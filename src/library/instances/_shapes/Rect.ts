@@ -83,16 +83,18 @@ export class Rect extends Shape {
      */
     public _isClicked() : boolean {
         const mouseVector = this._render.worldPosition();
+        const camera = this._render.currentCamera;
+        const current = this.position.sub(camera.offset);
         
         if (this.rotation === 0) {
-            return mouseVector.x >= this.position.x && 
-                   mouseVector.x <= this.position.x + this.width &&
-                   mouseVector.y >= this.position.y && 
-                   mouseVector.y <= this.position.y + this.height;
+            return mouseVector.x >= current.x && 
+                   mouseVector.x <= current.x + this.width &&
+                   mouseVector.y >= current.y && 
+                   mouseVector.y <= current.y + this.height;
         }
         
-        const dx = mouseVector.x - this.position.x;
-        const dy = mouseVector.y - this.position.y;
+        const dx = mouseVector.x - current.x;
+        const dy = mouseVector.y - current.y;
         
         const cos = Math.cos(-this.rotation);
         const sin = Math.sin(-this.rotation);
@@ -118,7 +120,8 @@ export class Rect extends Shape {
     public draw(): void {
         if (!this.visible) return;
         this._ctx.save();
-        this._ctx.translate(this.position.x, this.position.y);
+        const camera = this._render.currentCamera;
+        this._ctx.translate(this.position.x - camera.offset.x, this.position.y - camera.offset.y);
         this._ctx.rotate(this.rotation);
 
         this._ctx.beginPath();

@@ -26,6 +26,7 @@ export class RenderProvider {
         "bottom": [],
         "front": [],
         "back": [],
+        "update": [],
     };
 
     /**
@@ -50,6 +51,7 @@ export class RenderProvider {
     public on(event: "bottom", callback: ListenerCallback<"bottom">): void;
     public on(event: "front", callback: ListenerCallback<"front">): void;
     public on(event: "back", callback: ListenerCallback<"back">): void;
+    public on(event: "update", callback: ListenerCallback<"update">): void;
 
     /**
      * Registers an event listener for the specified event type
