@@ -38,8 +38,8 @@ export class SnapSmart {
     private _bestY: { diff: number, side: "top" | "bottom" | "centerY" } | null = null;
 
     private _snapTolerance: number = 30; // Snap tolerance in pixels
-    private _snapFactor: number = 0.01; // Snap factor
-    private _umbralTolerance: number = 300; // Umbral tolerance in pixels
+    private _snapFactor: number = 0.005; // Snap factor
+    private _umbralTolerance: number = 500; // Umbral tolerance in pixels
 
     private _candidatesX: { diff: number, side: "left" | "right" | "centerX" }[] = [];
     private _candidatesY: { diff: number, side: "top" | "bottom" | "centerY" }[] = [];
@@ -101,6 +101,21 @@ export class SnapSmart {
                 }
             });
         });
+
+        const viewportCenter = this._render.toWorldCoordinates(new Vector(this._render.canvas.width / 2, this._render.canvas.height / 2));
+        
+        const centerXDiff = viewportCenter.x - this._sides!["centerX"].value;
+        const centerYDiff = viewportCenter.y - this._sides!["centerY"].value;
+        
+        if (Math.abs(centerXDiff) < this._snapTolerance) {
+            this._candidatesX.push({ diff: centerXDiff, side: "centerX" });
+            this.addGuideLineX(viewportCenter.x);
+        }
+        
+        if (Math.abs(centerYDiff) < this._snapTolerance) {
+            this._candidatesY.push({ diff: centerYDiff, side: "centerY" });
+            this.addGuideLineY(viewportCenter.y);
+        }
 
         if (this._candidatesX.length > 0) {
             const bestX = this._candidatesX.reduce((a, b) => 
