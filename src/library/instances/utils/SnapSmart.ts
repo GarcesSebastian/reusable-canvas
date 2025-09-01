@@ -3,6 +3,7 @@ import { Rect } from "../_shapes/Rect";
 import { Circle } from "../_shapes/Circle";
 import { Shape } from "../Shape";
 import { Vector } from "../common/Vector";
+import { Text } from "../_shapes/Text";
 
 export interface SnapSides {
     left: { value: number; side: "right" };
@@ -169,6 +170,13 @@ export class SnapSmart {
             height = instance.radius * 2;
             left = instance.position.x - instance.radius;
             top = instance.position.y - instance.radius;
+        }
+
+        if (instance instanceof Text) {
+            width = instance.width + instance.padding.left + instance.padding.right + instance.borderWidth / 2;
+            height = instance.height + instance.padding.top + instance.padding.bottom + instance.borderWidth / 2;
+            left = instance.position.x - instance.padding.left - instance.borderWidth / 2;
+            top = instance.position.y - instance.ascent - instance.padding.top - instance.borderWidth / 2;
         }
 
         return {

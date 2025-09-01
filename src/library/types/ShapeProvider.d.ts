@@ -13,6 +13,8 @@ export type ShapeEventClick = ShapeEventTemplate;
 export type ShapeEventDragStart = ShapeEventTemplate;
 export type ShapeEventDragEnd = ShapeEventTemplate;
 export type ShapeEventDrag = ShapeEventTemplate;
+export type ShapeEventMouseDown = ShapeEventTemplate;
+export type ShapeEventMouseUp = ShapeEventTemplate;
 export type ShapeEventDestroy = {};
 
 export type ShapeEventsMap = {

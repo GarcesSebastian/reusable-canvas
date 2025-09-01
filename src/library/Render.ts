@@ -143,9 +143,6 @@ export class Render extends RenderProvider {
     private _onMouseDown(event: MouseEvent): void {
         this.emit("mousedown", this._getArgs(this))
 
-        this._getChildrens().forEach((child: Shape) => {
-            console.log(child._rawData().type, child._isClicked())
-        })
         this._draggingShape = this._getChildrens().find((child: Shape) => child._isClicked()) ?? null;
 
         if (this._draggingShape) {
@@ -196,6 +193,10 @@ export class Render extends RenderProvider {
 
     private _onMouseUp(): void {
         this.emit("mouseup", this._getArgs(this))
+
+        if (this._isDragging && this._draggingShape) {
+            this._draggingShape.emit("dragend", this._getArgs(this._draggingShape))
+        }
 
         this._isDragging = false;
         this._isPan = false;

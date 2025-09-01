@@ -32,6 +32,9 @@ export type TextRawData = ShapeRawData & {
     fontWeight: string;
     fontStyle: string;
     textAlign: string;
-    textBaseline: string;
     color: string;
+    backgroundColor: string;
+    borderWidth: number;
+    borderColor: string;
+    padding: { top: number; right: number; bottom: number; left: number };
 }
