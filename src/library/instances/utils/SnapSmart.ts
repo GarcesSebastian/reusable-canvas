@@ -2,6 +2,7 @@ import { Render } from "../../Render";
 import { Rect } from "../_shapes/Rect";
 import { Circle } from "../_shapes/Circle";
 import { Shape } from "../Shape";
+import { Vector } from "../common/Vector";
 
 export interface SnapSides {
     left: { value: number; side: "right" };
@@ -79,7 +80,7 @@ export class SnapSmart {
                 const diff = value.value - targetSide.value;
                 const diffAbs = Math.abs(diff);
 
-                if (diffAbs < this._snapTolerance) {
+                if (diffAbs < this._snapTolerance / 2) {
                     if ((side === "left" && diff > 0) ||
                         (side === "right" && diff < 0) ||
                         (side === "top" && diff > 0) ||
@@ -166,8 +167,8 @@ export class SnapSmart {
     }
 
     private addGuideLineX(x: number): void {
-        const topLeft = this._render.toWorldCoordinates({ x: 0, y: 0 } as any);
-        const bottomRight = this._render.toWorldCoordinates({ x: this._render.canvas.width, y: this._render.canvas.height } as any);
+        const topLeft = this._render.toWorldCoordinates(new Vector(this._render.currentCamera.offset.x, this._render.currentCamera.offset.y));
+        const bottomRight = this._render.toWorldCoordinates(new Vector(this._render.canvas.width + this._render.currentCamera.offset.x, this._render.canvas.height + this._render.currentCamera.offset.y));
         
         const y1 = topLeft.y;
         const y2 = bottomRight.y;
@@ -176,8 +177,8 @@ export class SnapSmart {
     }
 
     private addGuideLineY(y: number): void {
-        const topLeft = this._render.toWorldCoordinates({ x: 0, y: 0 } as any);
-        const bottomRight = this._render.toWorldCoordinates({ x: this._render.canvas.width, y: this._render.canvas.height } as any);
+        const topLeft = this._render.toWorldCoordinates(new Vector(this._render.currentCamera.offset.x, this._render.currentCamera.offset.y));
+        const bottomRight = this._render.toWorldCoordinates(new Vector(this._render.canvas.width + this._render.currentCamera.offset.x, this._render.canvas.height + this._render.currentCamera.offset.y));
         
         const x1 = topLeft.x;
         const x2 = bottomRight.x;
