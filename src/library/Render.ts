@@ -5,6 +5,7 @@ import { RenderManager } from "./managers/Render.manager";
 import { RenderProvider } from "./providers/Render.provider";
 import { RenderConfiguration, type RenderConfigurationProps } from "./helpers/Render.config";
 import { Camera } from "./instances/common/Camera";
+import { SnapSmart } from "./instances/utils/SnapSmart";
 
 export class Render extends RenderProvider {
     public canvas: HTMLCanvasElement
@@ -13,6 +14,8 @@ export class Render extends RenderProvider {
     public currentCamera: Camera;
     public childrens: Map<string, Shape> = new Map();
     public configuration: RenderConfiguration;
+
+    public snapSmart: SnapSmart;
 
     private _frameId: number | null = null
     private _renderBound: () => void = this._render.bind(this)
@@ -58,6 +61,7 @@ export class Render extends RenderProvider {
         this.manager = new RenderManager(this)
         this.configuration = new RenderConfiguration(this)
         this.currentCamera = new Camera(this)
+        this.snapSmart = new SnapSmart(this)
 
         this.setup()
         this.start()
@@ -144,6 +148,7 @@ export class Render extends RenderProvider {
         if (this._draggingShape) {
             this._isDragging = true;
             this._lastMousePos = this.worldPosition();
+            this.snapSmart.bind(this._draggingShape);
             return;
         }
 
@@ -164,6 +169,7 @@ export class Render extends RenderProvider {
             this._draggingShape.position.x += delta.x;
             this._draggingShape.position.y += delta.y;
             this._lastMousePos = current;
+            this.snapSmart.update();
         }
 
         if (this._isPan && this.configuration.config.pan) {
@@ -186,6 +192,7 @@ export class Render extends RenderProvider {
         this._isPan = false;
         this._draggingShape = null;
         this._lastMousePos = Vector.zero;
+        this.snapSmart.unbind();
     }
 
     private _onMouseClicked(): void {
@@ -264,6 +271,8 @@ export class Render extends RenderProvider {
             child.update()
         })
 
+        this.snapSmart.drawGuides()
+
         this.ctx.restore()
 
         this.ctx.save()
@@ -277,6 +286,10 @@ export class Render extends RenderProvider {
 
     public get zoom(): number {
         return this._zoom;
+    }
+
+    public get childs(): Shape[] {
+        return this._getChildrens();
     }
 
     public mousePosition(): Vector {
