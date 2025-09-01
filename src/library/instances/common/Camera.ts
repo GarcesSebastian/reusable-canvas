@@ -1,6 +1,5 @@
 import { Render } from "../../Render";
 import { Vector } from "../common/Vector";
-import { Reusable } from "../utils/Reusable";
 
 export class Camera {
     private _render: Render;   
@@ -9,7 +8,7 @@ export class Camera {
     public maxOffset: Vector;
 
     private _binded: boolean = false;
-    private _speed: number = 0.15;
+    private _speed: number = 0.1;
 
     public constructor(render: Render) {
         this.offset = Vector.zero;
@@ -19,8 +18,8 @@ export class Camera {
 
     public update(): void {
         if (this._binded) {
-            this.offset.x = Reusable.lerp(this.offset.x, this.maxOffset.x, this._speed);
-            this.offset.y = Reusable.lerp(this.offset.y, this.maxOffset.y, this._speed);
+            this.offset.x = Render.lerp(this.offset.x, this.maxOffset.x, this._speed);
+            this.offset.y = Render.lerp(this.offset.y, this.maxOffset.y, this._speed);
             return;
         }
     }

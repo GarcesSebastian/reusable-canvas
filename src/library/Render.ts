@@ -156,6 +156,7 @@ export class Render extends RenderProvider {
     private _onMouseMoved(event: MouseEvent): void {
         this._mousePosition.x = event.clientX
         this._mousePosition.y = event.clientY
+        if (!this.pointerInWorld(this.mousePosition())) return;
 
         if (this._isDragging && this._draggingShape) {
             const current = this.worldPosition();
@@ -314,6 +315,18 @@ export class Render extends RenderProvider {
 
     public loadConfiguration(config: RenderConfigurationProps): void {
         this.configuration.load(config)
+    }
+
+    public static randomInt(min: number, max: number): number {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    public static randomFloat(min: number, max: number): number {
+        return Math.random() * (max - min) + min;
+    }
+
+    public static lerp(start: number, end: number, t: number): number {
+        return start + (end - start) * t;
     }
 
     public start(): void {

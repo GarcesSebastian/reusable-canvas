@@ -1,3 +1,5 @@
+import { Render } from "../../Render";
+
 /**
  * 2D Vector class for mathematical operations and position handling
  * Provides common vector operations like addition, subtraction, scaling, and normalization
@@ -30,6 +32,19 @@ export class Vector {
      */
     public isNaN(): boolean {
         return isNaN(this.x) || isNaN(this.y);
+    }
+
+    /**
+     * Performs linear interpolation between this vector and another vector
+     * @param vector - The target vector to interpolate towards
+     * @param t - The interpolation factor (0 to 1)
+     * @returns A new Vector representing the interpolated result
+     */
+    public lerp(vector: Vector, t: number): Vector {
+        return new Vector(
+            Render.lerp(this.x, vector.x, t),
+            Render.lerp(this.y, vector.y, t)
+        );
     }
 
     /**
