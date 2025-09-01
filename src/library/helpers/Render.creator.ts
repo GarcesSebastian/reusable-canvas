@@ -2,6 +2,7 @@ import { Circle, type ICircle } from "../instances/_shapes/Circle";
 import { Vector } from "../instances/common/Vector";
 import { Render } from "../Render";
 import { IRect, Rect } from "../instances/_shapes/Rect";
+import { IText, Text } from "../instances/_shapes/Text";
 
 /**
  * Factory class for creating shapes and utility objects within a render context
@@ -38,6 +39,17 @@ export class RenderCreator {
         const circle = new Circle(props, this._render);
         this._render.emit("create", { shape: circle });
         return circle;
+    }
+
+    /**
+     * Creates a new text shape and emits creation event
+     * @param props - Configuration properties for the text
+     * @returns A new Text instance
+     */
+    public Text(props: IText): Text {
+        const text = new Text(props, this._render);
+        this._render.emit("create", { shape: text });
+        return text;
     }
 
     /**

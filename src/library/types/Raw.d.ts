@@ -1,6 +1,6 @@
 import type { Vector } from "../instances/common/Vector";
 
-export type ShapeType = "circle" | "rect";
+export type ShapeType = "circle" | "rect" | "text";
 
 export type ShapeRawData = {
     id: string;
@@ -23,4 +23,15 @@ export type RectRawData = ShapeRawData & {
     color: string;
     borderWidth: number;
     borderColor: string;
+}
+
+export type TextRawData = ShapeRawData & {
+    value: string;
+    fontSize: number;
+    fontFamily: string;
+    fontWeight: string;
+    fontStyle: string;
+    textAlign: string;
+    textBaseline: string;
+    color: string;
 }

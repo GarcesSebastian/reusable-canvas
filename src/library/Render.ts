@@ -143,6 +143,9 @@ export class Render extends RenderProvider {
     private _onMouseDown(event: MouseEvent): void {
         this.emit("mousedown", this._getArgs(this))
 
+        this._getChildrens().forEach((child: Shape) => {
+            console.log(child._rawData().type, child._isClicked())
+        })
         this._draggingShape = this._getChildrens().find((child: Shape) => child._isClicked()) ?? null;
 
         if (this._draggingShape) {

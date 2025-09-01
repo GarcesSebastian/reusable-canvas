@@ -101,6 +101,48 @@ export abstract class Shape extends ShapeProvider {
     }
 
     /**
+     * Raises the zIndex of the shape by 1.
+     * @returns The shape instance.
+     */
+    /**
+     * Raises the zIndex of the shape by 1.
+     * @returns The shape instance.
+     */
+    public setTop(): Shape {
+        this.zIndex += 1;
+        return this;
+    }
+
+    /**
+     * Lowers the zIndex of the shape by 1.
+     * @returns The shape instance.
+     */
+    public setBottom(): Shape {
+        this.zIndex -= 1;
+        return this;
+    }
+
+    /**
+     * Raises the zIndex of the shape to the maximum zIndex in the render.
+     * @returns The shape instance.
+     */
+    public setFront(): Shape {
+        this._render._maxZIndex += 1;
+        this.zIndex = this._render._maxZIndex;
+        return this;
+    }
+
+    /**
+     * Lowers the zIndex of the shape to the minimum zIndex in the render.
+     * @returns The shape instance.
+     */
+    public setBack(): Shape {
+        this._render._minZIndex -= 1;
+        this.zIndex = this._render._minZIndex;
+        return this;
+    }
+
+    /**
      * @internal
      * Abstract method to determine if a point (usually the mouse cursor) is inside the shape.
      * Must be implemented by concrete shape classes.
@@ -121,28 +163,6 @@ export abstract class Shape extends ShapeProvider {
      * @returns `true` if this shape overlaps the boundary area, otherwise `false`.
      */
     public abstract _isShapeInBoundary(boundaryX: number, boundaryY: number, boundaryWidth: number, boundaryHeight: number): boolean;
-
-    public setTop(): Shape {
-        this.zIndex += 1;
-        return this;
-    }
-
-    public setBottom(): Shape {
-        this.zIndex -= 1;
-        return this;
-    }
-
-    public setFront(): Shape {
-        this._render._maxZIndex += 1;
-        this.zIndex = this._render._maxZIndex;
-        return this;
-    }
-
-    public setBack(): Shape {
-        this._render._minZIndex -= 1;
-        this.zIndex = this._render._minZIndex;
-        return this;
-    }
 
     /**
      * Draws the shape on the canvas.
