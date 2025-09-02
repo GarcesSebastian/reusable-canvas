@@ -5,7 +5,12 @@ import { RenderManager } from "./managers/Render.manager";
 import { RenderProvider } from "./providers/Render.provider";
 import { RenderConfiguration, type RenderConfigurationProps } from "./helpers/Render.config";
 import { Camera } from "./instances/common/Camera";
+import { History } from "./instances/utils/History";
 import { SnapSmart } from "./instances/utils/SnapSmart";
+import { CircleRawData, RectRawData, ShapeRawData, TextRawData } from "./types/Raw";
+import { Rect } from "./instances/_shapes/Rect";
+import { Circle } from "./instances/_shapes/Circle";
+import { Text } from "./instances/_shapes/Text";
 
 export class Render extends RenderProvider {
     public canvas: HTMLCanvasElement
@@ -14,8 +19,10 @@ export class Render extends RenderProvider {
     public currentCamera: Camera;
     public childrens: Map<string, Shape> = new Map();
     public configuration: RenderConfiguration;
-
+    public history: History;
     public snapSmart: SnapSmart;
+
+    private _data: ShapeRawData[] = [];
 
     private _frameId: number | null = null
     private _renderBound: () => void = this._render.bind(this)
@@ -41,6 +48,7 @@ export class Render extends RenderProvider {
 
     private _zoom: number = 1
 
+    private _lastTimeClick: number = performance.now();
     private _lastFrameTime: number = performance.now()
     private _frameCount: number = 0
     private _fps: number = 0
@@ -62,6 +70,7 @@ export class Render extends RenderProvider {
         this.configuration = new RenderConfiguration(this)
         this.currentCamera = new Camera(this)
         this.snapSmart = new SnapSmart(this)
+        this.history = new History(this)
 
         this.setup()
         this.start()
@@ -70,6 +79,7 @@ export class Render extends RenderProvider {
     private setup(): void {
         this.config()
         this.events()
+        this.autoSave()
     }
 
     private config(): void {
@@ -218,6 +228,15 @@ export class Render extends RenderProvider {
             clicked = child;
         })
 
+        const now = performance.now();
+        const diff = now - this._lastTimeClick;
+        if (diff < 300) {
+            if (clicked) (clicked as Shape).emit("dblclick", this._getArgs(clicked))
+            else this.emit("dblclick", this._getArgs(this))
+            return;
+        }
+        this._lastTimeClick = performance.now();
+
         this.emit("click", this._getArgs(clicked ?? this))
     }
 
@@ -339,6 +358,36 @@ export class Render extends RenderProvider {
         const x = pointer.x - left
         const y = pointer.y - top
         return x >= 0 && x <= this.canvas.width && y >= 0 && y <= this.canvas.height
+    }
+
+    public undo(): void {
+        this.history.undo()
+    }
+
+    public redo(): void {
+        this.history.redo()
+    }
+
+    public autoSave(): void {
+        this._data = this.serialize();
+        this.emit("save", this._data);
+    }
+
+    public serialize(): ShapeRawData[] {
+        return Array.from(this.childrens.values()).map((child: Shape) => child._rawData());
+    }
+
+    public deserialize(data: ShapeRawData[]): void {
+        this.childrens.clear();
+        data.forEach((child: ShapeRawData) => {
+            if (child.type === "rect") {
+                Rect._fromRawData(child as RectRawData, this);
+            } else if (child.type === "circle") {
+                Circle._fromRawData(child as CircleRawData, this);
+            } else if (child.type === "text") {
+                Text._fromRawData(child as TextRawData, this);
+            }
+        });
     }
 
     public loadConfiguration(config: RenderConfigurationProps): void {

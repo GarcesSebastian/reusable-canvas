@@ -3,6 +3,15 @@ import { Render } from "../../Render";
 import { Vector } from "../common/Vector";
 import type { CircleRawData } from "../../types/Raw";
 
+/**
+ * Interface for circular shape properties.
+ * 
+ * @example
+ * ```ts
+ * const circle = new Circle({ radius: 50, color: 'blue' }, render);
+ * circle.update();
+ * ```
+ */
 export interface ICircle extends IShape {
     radius: number;
     color?: string;

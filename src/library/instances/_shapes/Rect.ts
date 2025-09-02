@@ -2,6 +2,15 @@ import { IShape, Shape } from "../Shape";
 import { Render } from "../../Render";
 import type { RectRawData } from "../../types/Raw";
 
+/**
+ * Interface for rectangular shape properties.
+ * 
+ * @example
+ * ```ts
+ * const rect = new Rect({ width: 100, height: 50, color: 'red' }, render);
+ * rect.update();
+ * ```
+ */
 export interface IRect extends IShape {
     width: number;
     height: number;

@@ -26,7 +26,7 @@ export type RectRawData = ShapeRawData & {
 }
 
 export type TextRawData = ShapeRawData & {
-    value: string;
+    text: string;
     fontSize: number;
     fontFamily: string;
     fontWeight: string;

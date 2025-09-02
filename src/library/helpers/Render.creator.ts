@@ -27,6 +27,7 @@ export class RenderCreator {
     public Rect(props: IRect): Rect {
         const rect = new Rect(props, this._render);
         this._render.emit("create", { shape: rect })
+        this._render.autoSave();
         return rect;
     }
 
@@ -38,6 +39,7 @@ export class RenderCreator {
     public Circle(props: ICircle): Circle {
         const circle = new Circle(props, this._render);
         this._render.emit("create", { shape: circle });
+        this._render.autoSave();
         return circle;
     }
 
@@ -49,6 +51,7 @@ export class RenderCreator {
     public Text(props: IText): Text {
         const text = new Text(props, this._render);
         this._render.emit("create", { shape: text });
+        this._render.autoSave();
         return text;
     }
 

@@ -10,6 +10,7 @@ export class RenderProvider {
         [K in RenderEventsType]: ListenerCallback<K>[]
     } = {
         "click": [],
+        "dblclick": [],
         "mousemove": [],
         "mousedown": [],
         "mouseup": [],
@@ -35,6 +36,7 @@ export class RenderProvider {
      * @param callback - The callback function to execute when event occurs
      */
     public on(event: "click", callback: ListenerCallback<"click">): void;
+    public on(event: "dblclick", callback: ListenerCallback<"dblclick">): void;
     public on(event: "mousemove", callback: ListenerCallback<"mousemove">): void;
     public on(event: "mousedown", callback: ListenerCallback<"mousedown">): void;
     public on(event: "mouseup", callback: ListenerCallback<"mouseup">): void;

@@ -20,6 +20,7 @@ export type RenderEventCreate = { shape: Shape };
 
 export type RenderEventMap = {
     "click": RenderEventClick;
+    "dblclick": RenderEventClick;
     "mousemove": RenderEventMouseMove;
     "mousedown": RenderEventMouseDown;
     "mouseup": RenderEventMouseUp;

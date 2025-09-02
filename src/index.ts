@@ -18,7 +18,8 @@ export type {
     ShapeEventDrag as _ShapeEventDrag,
     ShapeEventDragEnd as _ShapeEventDragEnd,
     ShapeEventDragStart as _ShapeEventDragStart,
-    ShapeEventDestroy as _ShapeEventDestroy
+    ShapeEventDestroy as _ShapeEventDestroy,
+    ShapeEventInput as _ShapeEventInput
 } from "./library/types/ShapeProvider";
 
 export type { 

@@ -13,11 +13,21 @@ export class ShapeProvider {
         [K in ShapeEventsType]: ShapeListenerCallback<K>[]
     } = {
         "click": [],
+        "dblclick": [],
         "dragstart": [],
         "dragend": [],
         "drag": [],
+        "input": [],
         "destroy": [],
     };
+
+    public on(event: "click", callback: ShapeListenerCallback<"click">): void;
+    public on(event: "dblclick", callback: ShapeListenerCallback<"dblclick">): void;
+    public on(event: "dragstart", callback: ShapeListenerCallback<"dragstart">): void;
+    public on(event: "dragend", callback: ShapeListenerCallback<"dragend">): void;
+    public on(event: "drag", callback: ShapeListenerCallback<"drag">): void;
+    public on(event: "input", callback: ShapeListenerCallback<"input">): void;
+    public on(event: "destroy", callback: ShapeListenerCallback<"destroy">): void;
 
     /**
      * Registers an event listener for the specified shape event type.
