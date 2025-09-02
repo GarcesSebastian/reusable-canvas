@@ -26,6 +26,7 @@ interface GuideLineX {
     x: number;
     y1: number;
     y2: number;
+    isViewport: boolean;
 }
 
 /**
@@ -36,6 +37,7 @@ interface GuideLineY {
     y: number;
     x1: number;
     x2: number;
+    isViewport: boolean;
 }
 
 /**
@@ -56,6 +58,8 @@ export class SnapSmart {
 
     /** Color of the guide lines (CSS color string). */
     public color: string = "#00ff00";
+    /** Color of the viewport guide lines (CSS color string). */
+    public colorViewport: string = "#00ffff";
     /** Width of the guide lines in pixels. */
     public lineWidth: number = 2;
     /** Dash pattern for guide lines [dash length, gap length]. */
@@ -112,7 +116,7 @@ export class SnapSmart {
         
         this.clearGuides();
 
-        const diff = this._render.toWorldCoordinates(new Vector(0,0)).sub(this._render.toWorldCoordinates(new Vector(this._render.canvas.width, this._render.canvas.height)));
+        const diff = this._render.toWorldCoordinates(new Vector(0, 0)).sub(this._render.toWorldCoordinates(new Vector(this._render.canvas.width, this._render.canvas.height)));
         const childs = this._render.childs.filter((child: Shape) => child !== this._target && child.visible);
         const closestChild = childs.filter((child: Shape) => {
             const distance = this._target!.position.sub(child.position).len();
@@ -150,19 +154,20 @@ export class SnapSmart {
             });
         });
 
+        const { left, top } = this._render.canvas.getBoundingClientRect();
         const viewportCenter = this._render.toWorldCoordinates(new Vector(this._render.canvas.width / 2, this._render.canvas.height / 2));
         
-        const centerXDiff = viewportCenter.x - this._sides!["centerX"].value;
-        const centerYDiff = viewportCenter.y - this._sides!["centerY"].value;
+        const centerXDiff = left + viewportCenter.x - this._sides!["centerX"].value;
+        const centerYDiff = top + viewportCenter.y - this._sides!["centerY"].value;
         
         if (Math.abs(centerXDiff) < this._snapTolerance) {
             this._candidatesX.push({ diff: centerXDiff, side: "centerX" });
-            this.addGuideLineX(viewportCenter.x);
+            this.addGuideLineX(left + viewportCenter.x, true);
         }
         
         if (Math.abs(centerYDiff) < this._snapTolerance) {
             this._candidatesY.push({ diff: centerYDiff, side: "centerY" });
-            this.addGuideLineY(viewportCenter.y);
+            this.addGuideLineY(top + viewportCenter.y, true);
         }
 
         if (this._candidatesX.length > 0) {
@@ -241,8 +246,8 @@ export class SnapSmart {
         }
 
         if (instance instanceof Text) {
-            width = instance.width + instance.padding.left + instance.padding.right + instance.borderWidth / 2;
-            height = instance.height + instance.padding.top + instance.padding.bottom + instance.borderWidth / 2;
+            width = instance.width + instance.padding.left + instance.padding.right + instance.borderWidth;
+            height = instance.height + instance.padding.top + instance.padding.bottom + instance.borderWidth;
             left = instance.position.x - instance.padding.left - instance.borderWidth / 2;
             top = instance.position.y - instance.ascent - instance.padding.top - instance.borderWidth / 2;
         }
@@ -264,14 +269,15 @@ export class SnapSmart {
      * @param x - The x-coordinate for the vertical guide line.
      * @private
      */
-    private addGuideLineX(x: number): void {
-        const topLeft = this._render.toWorldCoordinates(new Vector(this._render.currentCamera.offset.x, this._render.currentCamera.offset.y));
-        const bottomRight = this._render.toWorldCoordinates(new Vector(this._render.canvas.width + this._render.currentCamera.offset.x, this._render.canvas.height + this._render.currentCamera.offset.y));
-        
+    private addGuideLineX(x: number, isViewport: boolean = false): void {
+        const { height, top } = this._render.canvas.getBoundingClientRect();
+        const topLeft = this._render.toWorldCoordinates(new Vector(this._render.currentCamera.offset.x, this._render.currentCamera.offset.y + top));
+        const bottomRight = this._render.toWorldCoordinates(new Vector(this._render.canvas.width + this._render.currentCamera.offset.x, this._render.canvas.height + this._render.currentCamera.offset.y + height));
+
         const y1 = topLeft.y;
         const y2 = bottomRight.y;
         
-        this._guideLinesX.push({ x, y1, y2 });
+        this._guideLinesX.push({ x, y1, y2, isViewport: isViewport });
     }
 
     /**
@@ -281,14 +287,15 @@ export class SnapSmart {
      * @param y - The y-coordinate for the horizontal guide line.
      * @private
      */
-    private addGuideLineY(y: number): void {
+    private addGuideLineY(y: number, isViewport: boolean = false): void {
+        const { width, left } = this._render.canvas.getBoundingClientRect();
         const topLeft = this._render.toWorldCoordinates(new Vector(this._render.currentCamera.offset.x, this._render.currentCamera.offset.y));
         const bottomRight = this._render.toWorldCoordinates(new Vector(this._render.canvas.width + this._render.currentCamera.offset.x, this._render.canvas.height + this._render.currentCamera.offset.y));
         
-        const x1 = topLeft.x;
-        const x2 = bottomRight.x;
+        const x1 = topLeft.x + left;
+        const x2 = bottomRight.x + width;
         
-        this._guideLinesY.push({ y, x1, x2 });
+        this._guideLinesY.push({ y, x1, x2, isViewport: isViewport });
     }
 
     /**
@@ -310,11 +317,16 @@ export class SnapSmart {
         this._render.ctx.save();
         this._render.ctx.translate(this._render.currentCamera.offset.x, this._render.currentCamera.offset.y);
 
-        this._render.ctx.strokeStyle = this.color;
         this._render.ctx.lineWidth = this.lineWidth / this._render.zoom;
         this._render.ctx.setLineDash(this.lineDash);
-        
+
         this._guideLinesX.forEach(guide => {
+            if (guide.isViewport) {
+                this._render.ctx.strokeStyle = this.colorViewport;
+            } else {
+                this._render.ctx.strokeStyle = this.color;
+            }
+            
             this._render.ctx.beginPath();
             this._render.ctx.moveTo(guide.x, guide.y1);
             this._render.ctx.lineTo(guide.x, guide.y2);
@@ -322,6 +334,12 @@ export class SnapSmart {
         });
         
         this._guideLinesY.forEach(guide => {
+            if (guide.isViewport) {
+                this._render.ctx.strokeStyle = this.colorViewport;
+            } else {
+                this._render.ctx.strokeStyle = this.color;
+            }
+            
             this._render.ctx.beginPath();
             this._render.ctx.moveTo(guide.x1, guide.y);
             this._render.ctx.lineTo(guide.x2, guide.y);

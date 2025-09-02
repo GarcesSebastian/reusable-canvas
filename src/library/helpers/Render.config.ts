@@ -21,6 +21,8 @@ export interface Keys {
     back: string,
 }
 
+export type AutoSaveMethods = "cookies" | "localstorage" | null
+
 /**
  * Configuration properties for the render system.
  * Controls which features are enabled and defines keyboard shortcuts.
@@ -33,6 +35,7 @@ export interface RenderConfigurationProps {
     resize?: boolean,
     snap?: boolean,
     transform?: boolean,
+    save?: AutoSaveMethods,
     keywords?: Keys   
 }
 
@@ -78,6 +81,7 @@ export class RenderConfiguration {
             resize: false,
             snap: false,
             transform: false,
+            save: null,
             keywords: RenderConfiguration.defaultKeyWords()
         }
 

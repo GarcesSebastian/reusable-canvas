@@ -12,9 +12,11 @@ import { Rect } from "./instances/_shapes/Rect";
 import { Circle } from "./instances/_shapes/Circle";
 import { Text } from "./instances/_shapes/Text";
 
+import Cookies from "js-cookie"
+
 /**
- * Clase principal del sistema de renderizado.
- * Gestiona el canvas, los eventos del ratón, el zoom, el desplazamiento y las formas dibujadas.
+ * Main rendering system class.
+ * Manages the canvas, mouse events, zoom, panning, and drawn shapes.
  *
  * @example
  * ```ts
@@ -24,91 +26,91 @@ import { Text } from "./instances/_shapes/Text";
  * ```
  */
 export class Render extends RenderProvider {
-    /** Elemento canvas HTML que se utilizará para el renderizado. */
+    /** HTML canvas element used for rendering. */
     public canvas: HTMLCanvasElement
-    /** Contexto 2D del canvas para operaciones de dibujo. */
+    /** 2D canvas context for drawing operations. */
     public ctx: CanvasRenderingContext2D
 
-    /** Cámara actual que controla la vista del canvas. */
+    /** Current camera that controls the canvas view. */
     public currentCamera: Camera;
-    /** Mapa de todas las formas en el canvas, indexadas por su ID. */
+    /** Map of all shapes on the canvas, indexed by their ID. */
     public childrens: Map<string, Shape> = new Map();
-    /** Configuración del sistema de renderizado. */
+    /** Rendering system configuration. */
     public configuration: RenderConfiguration;
-    /** Sistema de historial para operaciones de deshacer/rehacer. */
+    /** History system for undo/redo operations. */
     public history: History;
-    /** Sistema de alineación inteligente para las formas. */
+    /** Smart snapping system for shapes. */
     public snapSmart: SnapSmart;
 
-    /** Datos serializados de las formas para autoguardado. */
+    /** Serialized shape data for auto-save. */
     private _data: ShapeRawData[] = [];
 
-    /** ID del frame de animación actual. */
+    /** Current animation frame ID. */
     private _frameId: number | null = null
-    /** Función de renderizado vinculada para mantener el contexto correcto. */
+    /** Bound rendering function to maintain the correct context. */
     private _renderBound: () => void = this._render.bind(this)
-    /** Función de redimensionamiento vinculada para mantener el contexto correcto. */
+    /** Bound resize function to maintain the correct context. */
     private _resizeBound: () => void = this._resize.bind(this)
-    /** Función para el menú contextual vinculada para mantener el contexto correcto. */
+    /** Bound context menu function to maintain the correct context. */
     private _onContextmenuBound: (event: MouseEvent) => void = this._onContextmenu.bind(this);
 
-    /** Función para click del ratón vinculada. */
+    /** Bound mouse click function. */
     private _onMouseClickedBound: (event: MouseEvent) => void = this._onMouseClicked.bind(this);
-    /** Función para pulsar botón del ratón vinculada. */
+    /** Bound mouse down function. */
     private _onMouseDownBound: (event: MouseEvent) => void = this._onMouseDown.bind(this);
-    /** Función para movimiento del ratón vinculada. */
+    /** Bound mouse move function. */
     private _onMouseMovedBound: (event: MouseEvent) => void = this._onMouseMoved.bind(this);
-    /** Función para soltar botón del ratón vinculada. */
+    /** Bound mouse up function. */
     private _onMouseUpBound: (event: MouseEvent) => void = this._onMouseUp.bind(this);
-    /** Función para rueda del ratón vinculada. */
+    /** Bound mouse wheel function. */
     private _onMouseWheelBound: (event: WheelEvent) => void = this._onMouseWheel.bind(this);
-    /** Función para tecla pulsada vinculada. */
+    /** Bound key down function. */
     private _onKeyDownBound: (event: KeyboardEvent) => void = this._onKeyDown.bind(this);
-    /** Función para tecla soltada vinculada. */
+    /** Bound key up function. */
     private _onKeyUpBound: (event: KeyboardEvent) => void = this._onKeyUp.bind(this);
 
-    /** Forma que está siendo arrastrada actualmente. */
+    /** Shape currently being dragged. */
     private _draggingShape: Shape | null = null
 
-    /** Posición actual del ratón en coordenadas absolutas. */
+    /** Current mouse position in absolute coordinates. */
     private _mousePosition: Vector = new Vector(0, 0)
-    /** Última posición registrada del ratón. */
+    /** Last recorded mouse position. */
     private _lastMousePos: Vector = new Vector(0, 0)
 
-    /** Indica si el modo zoom está activo (tecla Ctrl pulsada). */
+    /** Indicates if zoom mode is active (Ctrl key pressed). */
     private _isZooming: boolean = false
-    /** Indica si el modo desplazamiento está activo. */
+    /** Indicates if pan mode is active. */
     private _isPan: boolean = false
-    /** Indica si se está arrastrando una forma. */
+    /** Indicates if a shape is being dragged. */
     private _isDragging: boolean = false
 
-    /** Factor de zoom actual. */
+    /** Current zoom factor. */
     private _zoom: number = 1
 
-    /** Último tiempo registrado de un click para detectar doble click. */
+    /** Last recorded click time to detect double clicks. */
     private _lastTimeClick: number = performance.now();
-    /** Último tiempo registrado para calcular FPS. */
+    /** Last recorded time to calculate FPS. */
     private _lastFrameTime: number = performance.now()
-    /** Contador de frames para calcular FPS. */
+    /** Frame counter for calculating FPS. */
     private _frameCount: number = 0
-    /** Frames por segundo actuales. */
+    /** Current frames per second. */
     private _fps: number = 0
 
-    /** Posición global del canvas (para desplazamiento). */
+    /** Global canvas position (for panning). */
     public _globalPosition: Vector = new Vector(0, 0)
-    /** Valor máximo de zIndex de todas las formas. */
+    /** Maximum zIndex value of all shapes. */
     public _maxZIndex: number = 0
-    /** Valor mínimo de zIndex de todas las formas. */
+    /** Minimum zIndex value of all shapes. */
     public _minZIndex: number = 0
 
-    /** Creador de formas y elementos. */
+    /** Creator for shapes and elements. */
     public creator: RenderCreator;
-    /** Gestor de elementos del renderizador. */
+    /** Manager for renderer elements. */
     public manager: RenderManager;
 
     /**
-     * Crea una nueva instancia del renderizador.
-     * @param canvas - El elemento canvas HTML donde se realizará el renderizado.
+     * Creates a new renderer instance.
+     * @param canvas - The HTML canvas element where rendering will be performed.
      */
     public constructor(canvas: HTMLCanvasElement) {
         super();
@@ -127,17 +129,19 @@ export class Render extends RenderProvider {
     }
 
     /**
-     * Configura el renderizador inicializando todos los componentes necesarios.
+     * Sets up the renderer by initializing all necessary components.
      * @private
      */
     private setup(): void {
         this.config()
         this.events()
-        this.autoSave()
+        this._customEvents()
+
+        this.load()
     }
 
     /**
-     * Aplica la configuración inicial al renderizador.
+     * Applies the initial configuration to the renderer.
      * @private
      */
     private config(): void {
@@ -145,7 +149,7 @@ export class Render extends RenderProvider {
     }
 
     /**
-     * Configura los eventos del navegador necesarios para la interacción.
+     * Sets up the browser events needed for interaction.
      * @private
      */
     private events(): void {
@@ -166,8 +170,18 @@ export class Render extends RenderProvider {
     }
 
     /**
-     * Maneja el evento de tecla pulsada.
-     * @param event - Evento de teclado.
+     * Sets up custom events.
+     * @private
+     */
+    private _customEvents(): void {
+        this.on("save", () => {
+            this.autoSave(false);
+        })
+    }
+
+    /**
+     * Handles the key down event.
+     * @param event - Keyboard event.
      * @private
      */
     private _onKeyDown(event: KeyboardEvent): void {
@@ -177,8 +191,8 @@ export class Render extends RenderProvider {
     }
 
     /**
-     * Maneja el evento de tecla soltada.
-     * @param event - Evento de teclado.
+     * Handles the key up event.
+     * @param event - Keyboard event.
      * @private
      */
     private _onKeyUp(event: KeyboardEvent): void {
@@ -188,8 +202,8 @@ export class Render extends RenderProvider {
     }
 
     /**
-     * Maneja el evento de la rueda del ratón para zoom y desplazamiento.
-     * @param event - Evento de la rueda del ratón.
+     * Handles the mouse wheel event for zoom and panning.
+     * @param event - Mouse wheel event.
      * @private
      */
     private _onMouseWheel(event: WheelEvent): void {
@@ -228,9 +242,9 @@ export class Render extends RenderProvider {
     }
 
     /**
-     * Maneja el evento de botón del ratón pulsado.
-     * Inicia el arrastre de formas o el desplazamiento del canvas.
-     * @param event - Evento del ratón.
+     * Handles the mouse button down event.
+     * Initiates shape dragging or canvas panning.
+     * @param event - Mouse event.
      * @private
      */
     private _onMouseDown(event: MouseEvent): void {
@@ -255,9 +269,9 @@ export class Render extends RenderProvider {
     }
 
     /**
-     * Maneja el evento de movimiento del ratón.
-     * Actualiza la posición del ratón y gestiona el arrastre de formas y desplazamiento.
-     * @param event - Evento del ratón.
+     * Handles the mouse move event.
+     * Updates the mouse position and manages shape dragging and panning.
+     * @param event - Mouse event.
      * @private
      */
     private _onMouseMoved(event: MouseEvent): void {
@@ -291,8 +305,8 @@ export class Render extends RenderProvider {
     }
 
     /**
-     * Maneja el evento de botón del ratón soltado.
-     * Finaliza el arrastre de formas y el desplazamiento.
+     * Handles the mouse button up event.
+     * Finalizes shape dragging and panning.
      * @private
      */
     private _onMouseUp(): void {
@@ -300,6 +314,7 @@ export class Render extends RenderProvider {
 
         if (this._isDragging && this._draggingShape) {
             this._draggingShape.emit("dragend", this._getArgs(this._draggingShape))
+            this.autoSave();
         }
 
         this._isDragging = false;
@@ -313,8 +328,8 @@ export class Render extends RenderProvider {
     }
 
     /**
-     * Maneja el evento de click del ratón.
-     * Detecta clicks simples y dobles en las formas o en el canvas.
+     * Handles the mouse click event.
+     * Detects single and double clicks on shapes or on the canvas.
      * @private
      */
     private _onMouseClicked(): void {
@@ -340,9 +355,9 @@ export class Render extends RenderProvider {
     }
 
     /**
-     * Maneja el evento de menú contextual (click derecho).
-     * Previene el comportamiento por defecto del navegador.
-     * @param event - Evento del ratón.
+     * Handles the context menu event (right click).
+     * Prevents the browser's default behavior.
+     * @param event - Mouse event.
      * @private
      */
     private _onContextmenu(event: MouseEvent): void {
@@ -350,8 +365,8 @@ export class Render extends RenderProvider {
     }
 
     /**
-     * Obtiene la lista de todas las formas ordenadas por su zIndex.
-     * @returns Lista ordenada de formas.
+     * Gets the list of all shapes ordered by their zIndex.
+     * @returns Sorted list of shapes.
      * @private
      */
     private _getChildrens(): Shape[] {
@@ -359,9 +374,9 @@ export class Render extends RenderProvider {
     }
 
     /**
-     * Construye los argumentos para los eventos.
-     * @param child - La forma o el renderizador asociado al evento.
-     * @returns Objeto con información del evento.
+     * Builds the arguments for events.
+     * @param child - The shape or renderer associated with the event.
+     * @returns Object with event information.
      * @private
      */
     private _getArgs<T>(child: Shape | Render): T {
@@ -375,7 +390,7 @@ export class Render extends RenderProvider {
     }
 
     /**
-     * Ajusta el tamaño del canvas para que coincida con su tamaño visual.
+     * Adjusts the canvas size to match its visual size.
      * @private
      */
     private _resize(): void {
@@ -385,7 +400,7 @@ export class Render extends RenderProvider {
     }
 
     /**
-     * Actualiza el contador de FPS (frames por segundo).
+     * Updates the FPS (frames per second) counter.
      * @private
      */
     private _updateFps() : void {
@@ -401,7 +416,7 @@ export class Render extends RenderProvider {
     }
 
     /**
-     * Muestra el contador de FPS en la esquina superior derecha del canvas.
+     * Displays the FPS counter in the top-right corner of the canvas.
      * @private
      */
     private _showFps() : void {
@@ -415,7 +430,7 @@ export class Render extends RenderProvider {
     }
 
     /**
-     * Limpia el canvas para prepararlo para el siguiente frame.
+     * Clears the canvas to prepare it for the next frame.
      * @private
      */
     private _clear(): void {
@@ -423,8 +438,8 @@ export class Render extends RenderProvider {
     }
 
     /**
-     * Función principal de renderizado llamada en cada frame de animación.
-     * Actualiza la cámara, renderiza todas las formas y muestra los FPS.
+     * Main rendering function called on each animation frame.
+     * Updates the camera, renders all shapes, and displays the FPS.
      * @private
      */
     private _render(): void {
@@ -456,32 +471,32 @@ export class Render extends RenderProvider {
     }
 
     /**
-     * Obtiene el factor de zoom actual.
-     * @returns El factor de zoom.
+     * Gets the current zoom factor.
+     * @returns The zoom factor.
      */
     public get zoom(): number {
         return this._zoom;
     }
 
     /**
-     * Obtiene la lista de todas las formas presentes en el canvas.
-     * @returns Lista de formas ordenadas por zIndex.
+     * Gets the list of all shapes present on the canvas.
+     * @returns List of shapes ordered by zIndex.
      */
     public get childs(): Shape[] {
         return this._getChildrens();
     }
 
     /**
-     * Obtiene la posición actual del ratón en coordenadas absolutas de la ventana.
-     * @returns Vector con la posición del ratón.
+     * Gets the current mouse position in absolute window coordinates.
+     * @returns Vector with the mouse position.
      */
     public mousePosition(): Vector {
         return this._mousePosition;
     }
 
     /**
-     * Obtiene la posición del ratón relativa al canvas.
-     * @returns Vector con la posición relativa del ratón.
+     * Gets the mouse position relative to the canvas.
+     * @returns Vector with the relative mouse position.
      */
     public relativePosition(): Vector {
         const { left, top } = this.canvas.getBoundingClientRect()
@@ -489,17 +504,17 @@ export class Render extends RenderProvider {
     }
 
     /**
-     * Obtiene la posición del ratón en coordenadas del mundo (teniendo en cuenta zoom y desplazamiento).
-     * @returns Vector con la posición del mundo.
+     * Gets the mouse position in world coordinates (taking into account zoom and panning).
+     * @returns Vector with the world position.
      */
     public worldPosition(): Vector {
         return this.toWorldCoordinates(this.mousePosition());
     }
 
     /**
-     * Convierte una posición absoluta a coordenadas del mundo.
-     * @param vector - Vector con coordenadas absolutas.
-     * @returns Vector con coordenadas del mundo.
+     * Converts an absolute position to world coordinates.
+     * @param vector - Vector with absolute coordinates.
+     * @returns Vector with world coordinates.
      */
     public toWorldCoordinates(vector: Vector): Vector {
         const rect = this.canvas.getBoundingClientRect()
@@ -509,9 +524,9 @@ export class Render extends RenderProvider {
     }
 
     /**
-     * Convierte una posición del mundo a coordenadas absolutas.
-     * @param vector - Vector con coordenadas del mundo.
-     * @returns Vector con coordenadas absolutas.
+     * Converts a world position to absolute coordinates.
+     * @param vector - Vector with world coordinates.
+     * @returns Vector with absolute coordinates.
      */
     public toAbsoluteCoordinates(vector: Vector): Vector {
         const rect = this.canvas.getBoundingClientRect()
@@ -521,9 +536,9 @@ export class Render extends RenderProvider {
     }
 
     /**
-     * Determina si un punto está dentro del área visible del canvas.
-     * @param pointer - Vector con la posición a comprobar.
-     * @returns true si el punto está dentro del canvas, false en caso contrario.
+     * Determines if a point is within the visible area of the canvas.
+     * @param pointer - Vector with the position to check.
+     * @returns true if the point is inside the canvas, false otherwise.
      */
     public pointerInWorld(pointer: Vector): boolean {
         const { left, top } = this.canvas.getBoundingClientRect()
@@ -533,38 +548,90 @@ export class Render extends RenderProvider {
     }
 
     /**
-     * Deshace la última operación en el historial.
+     * Undoes the last operation in history.
      */
     public undo(): void {
         this.history.undo()
     }
 
     /**
-     * Rehace la última operación deshecha.
+     * Redoes the last undone operation.
      */
     public redo(): void {
         this.history.redo()
     }
 
     /**
-     * Guarda automáticamente el estado actual del canvas.
+     * Automatically saves the current state of the canvas.
+     * @param history - If true, adds the save to history; otherwise just saves without adding to history.
      */
-    public autoSave(): void {
-        this._data = this.serialize();
-        this.emit("save", this._data);
+    public autoSave(history: boolean = true): void {
+        const newData = this.serialize();
+        this._data = newData;
+
+        if (this.configuration.config.save === "cookies") {
+            Cookies.set("canvasData", JSON.stringify(newData));
+        } else if (this.configuration.config.save === "localstorage") {
+            localStorage.setItem("canvasData", JSON.stringify(newData));
+        }
+
+        console.log(`Canvas data auto-saved successfully ${this.configuration.config.save}`, newData);
+
+        if (history) this.history.save(this._data);
     }
 
     /**
-     * Serializa todas las formas del canvas a un formato JSON.
-     * @returns Array de datos serializados de las formas.
+     * Loads the canvas state from serialized data.
+     * @param defaultData - Serialized shape data.
+     */
+    public load(defaultData?: ShapeRawData[]): void {
+        if (defaultData) {
+            this.deserialize(defaultData);
+            return;
+        }
+    
+        if (typeof window === "undefined") {
+            console.warn("Render.load(): No browser environment (localStorage/cookies not available).");
+            return;
+        }
+    
+        let data: ShapeRawData[] | null = null;
+    
+        try {
+            if (this.configuration.config.save === "cookies") {
+                const cookieData = Cookies.get("canvasData");
+                if (cookieData) {
+                    data = JSON.parse(cookieData);
+                }
+            } else if (this.configuration.config.save === "localstorage") {
+                const localData = localStorage.getItem("canvasData");
+                if (localData) {
+                    data = JSON.parse(localData);
+                }
+            }
+    
+            if (data && Array.isArray(data)) {
+                this.deserialize(data);
+            }
+
+            console.log(`Canvas data loaded successfully ${this.configuration.config.save}`, data);
+        } catch (error) {
+            console.error("Error loading canvas data:", error);
+        }
+    }
+    
+
+    /**
+     * Serializes all shapes on the canvas to JSON format.
+     * @returns Array of serialized shape data.
      */
     public serialize(): ShapeRawData[] {
         return Array.from(this.childrens.values()).map((child: Shape) => child._rawData());
     }
 
     /**
-     * Recrea las formas a partir de datos serializados.
-     * @param data - Datos serializados de las formas.
+     * Recreates shapes from serialized data.
+     * @param data - Serialized shape data.
      */
     public deserialize(data: ShapeRawData[]): void {
         this.childrens.clear();
@@ -580,46 +647,47 @@ export class Render extends RenderProvider {
     }
 
     /**
-     * Carga una nueva configuración para el renderizador.
-     * @param config - Objeto de configuración.
+     * Loads a new configuration for the renderer.
+     * @param config - Configuration object.
      */
     public loadConfiguration(config: RenderConfigurationProps): void {
         this.configuration.load(config)
+        this.load()
     }
 
     /**
-     * Genera un número entero aleatorio en un rango especificado.
-     * @param min - Valor mínimo (inclusive).
-     * @param max - Valor máximo (inclusive).
-     * @returns Número entero aleatorio.
+     * Generates a random integer within a specified range.
+     * @param min - Minimum value (inclusive).
+     * @param max - Maximum value (inclusive).
+     * @returns Random integer.
      */
     public static randomInt(min: number, max: number): number {
         return Math.floor(Math.random() * (max - min + 1)) + min;
     }
 
     /**
-     * Genera un número decimal aleatorio en un rango especificado.
-     * @param min - Valor mínimo (inclusive).
-     * @param max - Valor máximo (exclusive).
-     * @returns Número decimal aleatorio.
+     * Generates a random float within a specified range.
+     * @param min - Minimum value (inclusive).
+     * @param max - Maximum value (exclusive).
+     * @returns Random float.
      */
     public static randomFloat(min: number, max: number): number {
         return Math.random() * (max - min) + min;
     }
 
     /**
-     * Realiza una interpolación lineal entre dos valores.
-     * @param start - Valor inicial.
-     * @param end - Valor final.
-     * @param t - Factor de interpolación (0-1).
-     * @returns Valor interpolado.
+     * Performs linear interpolation between two values.
+     * @param start - Initial value.
+     * @param end - Final value.
+     * @param t - Interpolation factor (0-1).
+     * @returns Interpolated value.
      */
     public static lerp(start: number, end: number, t: number): number {
         return start + (end - start) * t;
     }
 
     /**
-     * Inicia el bucle de renderizado.
+     * Starts the rendering loop.
      */
     public start(): void {
         if (this._frameId) return
@@ -627,7 +695,7 @@ export class Render extends RenderProvider {
     }
 
     /**
-     * Detiene el bucle de renderizado.
+     * Stops the rendering loop.
      */
     public stop(): void {
         if (!this._frameId) return
@@ -636,8 +704,8 @@ export class Render extends RenderProvider {
     }
 
     /**
-     * Limpia todos los recursos y elimina los eventos.
-     * Debe llamarse antes de eliminar la instancia del renderizador.
+     * Cleans up all resources and removes event listeners.
+     * Should be called before removing the renderer instance.
      */
     public destroy() : void {
         this.stop();

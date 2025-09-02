@@ -1,6 +1,7 @@
 import { IShape, Shape } from "../Shape";
 import { Render } from "../../Render";
 import type { RectRawData } from "../../types/Raw";
+import { Vector } from "../common/Vector";
 
 /**
  * Interface for rectangular shape properties.
@@ -199,7 +200,7 @@ export class Rect extends Shape {
      */
     public static _fromRawData(data: RectRawData, render: Render) : Rect {
         const rect = new Rect(data, render, data.id);
-        rect.position = data.position;
+        rect.position = new Vector(data.position.x, data.position.y);
         rect.rotation = data.rotation;
         rect.zIndex = data.zIndex;
         rect.dragging = data.dragging;

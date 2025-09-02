@@ -426,10 +426,10 @@ export class Text extends Shape {
             const boundingX = current.x + offsetX;
             const boundingY = current.y + offsetY;
             
-            return mouseVector.x >= boundingX && 
-                   mouseVector.x <= boundingX + this._width &&
-                   mouseVector.y >= boundingY && 
-                   mouseVector.y <= boundingY + this._height;
+            return mouseVector.x >= boundingX - this.padding.left && 
+                   mouseVector.x <= boundingX + this._width + this.padding.right &&
+                   mouseVector.y >= boundingY - this.ascent - this.padding.top && 
+                   mouseVector.y <= boundingY + this._height + this.descent + this.padding.bottom;
         }
         
         const dx = mouseVector.x - current.x;

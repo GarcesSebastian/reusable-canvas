@@ -34,12 +34,6 @@ export class History {
      * Listens for save, undo, and redo events from the renderer.
      */
     public start(): void {
-        this._render.on("save", () => {
-            this._index++;
-            this._history[this._index] = this._render.serialize();
-            console.log(this._history);
-        })
-
         this._render.on("undo", () => {
             this.undo();
         })
@@ -49,6 +43,16 @@ export class History {
         })
     }
 
+    public save(data: ShapeRawData[]): void {
+        this._index++;
+        
+        if (this._index < this._history.length) {
+            this._history = this._history.slice(0, this._index);
+        }
+
+        this._history[this._index] = JSON.parse(JSON.stringify(data));
+    }
+
     /**
      * Reverts to the previous canvas state.
      * Does nothing if at the beginning of the history stack.
@@ -56,7 +60,8 @@ export class History {
     public undo(): void {
         if (this._index <= 0) return;
         this._index--;
-        this._render.deserialize(this._history[this._index]!);
+        const historyState = JSON.parse(JSON.stringify(this._history[this._index]));
+        this._render.deserialize(historyState);
     }
 
     /**
@@ -66,6 +71,7 @@ export class History {
     public redo(): void {
         if (this._index >= this._history.length - 1) return;
         this._index++;
-        this._render.deserialize(this._history[this._index]!);
+        const historyState = JSON.parse(JSON.stringify(this._history[this._index]));
+        this._render.deserialize(historyState);
     }
 }
