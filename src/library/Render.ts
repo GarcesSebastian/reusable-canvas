@@ -566,6 +566,7 @@ export class Render extends RenderProvider {
      * @param history - If true, adds the save to history; otherwise just saves without adding to history.
      */
     public autoSave(history: boolean = true): void {
+        if (!this.configuration.config.save) return;
         const newData = this.serialize();
         this._data = newData;
 
@@ -575,8 +576,6 @@ export class Render extends RenderProvider {
             localStorage.setItem("canvasData", JSON.stringify(newData));
         }
 
-        console.log(`Canvas data auto-saved successfully ${this.configuration.config.save}`, newData);
-
         if (history) this.history.save(this._data);
     }
 
@@ -585,6 +584,7 @@ export class Render extends RenderProvider {
      * @param defaultData - Serialized shape data.
      */
     public load(defaultData?: ShapeRawData[]): void {
+        if (!this.configuration.config.save) return;
         if (defaultData) {
             this.deserialize(defaultData);
             return;
@@ -613,8 +613,6 @@ export class Render extends RenderProvider {
             if (data && Array.isArray(data)) {
                 this.deserialize(data);
             }
-
-            console.log(`Canvas data loaded successfully ${this.configuration.config.save}`, data);
         } catch (error) {
             console.error("Error loading canvas data:", error);
         }
