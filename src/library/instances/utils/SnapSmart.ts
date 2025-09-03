@@ -4,6 +4,7 @@ import { Circle } from "../_shapes/Circle";
 import { Shape } from "../Shape";
 import { Vector } from "../common/Vector";
 import { Text } from "../_shapes/Text";
+import { Transformer } from "../common/Transformer";
 
 /**
  * Interface representing the snap points for different sides of a shape.
@@ -66,7 +67,7 @@ export class SnapSmart {
     public lineDash: number[] = [5, 5];
     
     /** Currently targeted shape for snapping. */
-    private _target: Shape | null = null;
+    private _target: Shape | Transformer | null = null;
     /** Cached sides information of the target shape. */
     private _sides: SnapSides | null = null;
     /** Best horizontal snap candidate. */
@@ -98,11 +99,30 @@ export class SnapSmart {
 
         this._render.on("mouseup", () => {
             if (this._target) {
-                this._target.position.x += this._bestX?.diff ?? 0;
-                this._target.position.y += this._bestY?.diff ?? 0;
+                this._position.x += this._bestX?.diff ?? 0;
+                this._position.y += this._bestY?.diff ?? 0;
             }
             this.clearGuides();
         });
+    }
+
+    /**
+     * Retrieves the current position of the target shape or transformer.
+     * @returns The position as a Vector.
+     */
+    private get _position(): Vector {
+        let position: Vector = new Vector(0, 0);
+        if (!this._target) return position;
+
+        if (this._target instanceof Shape) {
+            position = this._target.position;
+        }
+
+        if (this._target instanceof Transformer) {
+            position = this._target.position;
+        }
+
+        return position;
     }
 
     /**
@@ -196,7 +216,7 @@ export class SnapSmart {
      * 
      * @param instance - The shape to bind for snapping.
      */
-    public bind(instance: Shape) {
+    public bind(instance: Shape | Transformer) {
         this._target = instance;
         this.sides();
     }
@@ -227,7 +247,7 @@ export class SnapSmart {
      * @param instance - The shape to calculate sides for.
      * @returns Object containing coordinates and complementary sides for snapping.
      */
-    public getSides(instance: Shape): SnapSides {
+    public getSides(instance: Shape | Transformer): SnapSides {
         let width = 0;
         let height = 0;
         let left = instance.position.x;
@@ -250,6 +270,13 @@ export class SnapSmart {
             height = instance.height + instance.padding.top + instance.padding.bottom + instance.borderWidth;
             left = instance.position.x - instance.padding.left - instance.borderWidth / 2;
             top = instance.position.y - instance.ascent - instance.padding.top - instance.borderWidth / 2;
+        }
+
+        if (instance instanceof Transformer) {
+            width = instance.width;
+            height = instance.height;
+            left = instance.position.x;
+            top = instance.position.y;
         }
 
         return {

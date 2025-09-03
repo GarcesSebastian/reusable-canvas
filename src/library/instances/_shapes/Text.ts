@@ -383,6 +383,22 @@ export class Text extends Shape {
     }
 
     /**
+     * Set the calculated width of the text content.
+     * @param v - Width of the text in pixels.
+     */
+    public set width(v: number) {
+        this._width = v;
+    }
+
+    /**
+     * Set the calculated height of the text content.
+     * @param v - Height of the text in pixels.
+     */
+    public set height(v: number) {
+        this._height = v;
+    }
+
+    /**
      * Get the ascent of the text for vertical positioning.
      * @returns The ascent value in pixels.
      */
@@ -425,11 +441,15 @@ export class Text extends Shape {
         if (this.rotation === 0) {
             const boundingX = current.x + offsetX;
             const boundingY = current.y + offsetY;
-            
-            return mouseVector.x >= boundingX - this.padding.left && 
-                   mouseVector.x <= boundingX + this._width + this.padding.right &&
-                   mouseVector.y >= boundingY - this.ascent - this.padding.top && 
-                   mouseVector.y <= boundingY + this._height + this.descent + this.padding.bottom;
+            const x = boundingX - this.padding.left - this.borderWidth / 2;
+            const y = boundingY - this.padding.top - this.borderWidth / 2;
+            const width = this._width + this.padding.left + this.padding.right + this.borderWidth;
+            const height = this._height + this.padding.top + this.padding.bottom + this.borderWidth;
+
+            return mouseVector.x >= x && 
+                   mouseVector.x <= x + width &&
+                   mouseVector.y >= y && 
+                   mouseVector.y <= y + height;
         }
         
         const dx = mouseVector.x - current.x;

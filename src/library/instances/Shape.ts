@@ -39,6 +39,8 @@ export abstract class Shape extends ShapeProvider {
     public visible: boolean;
     /** If true, the shape will be automatically saved to the render instance. */
     public _autoSave: boolean = true;
+    /** If true, the shape will be selected. */
+    public isSelected: boolean = false;
     
     /** Manages shape-specific functionalities and properties. */
     public manager: ShapeManager;

@@ -11,6 +11,7 @@ import { CircleRawData, RectRawData, ShapeRawData, TextRawData } from "./types/R
 import { Rect } from "./instances/_shapes/Rect";
 import { Circle } from "./instances/_shapes/Circle";
 import { Text } from "./instances/_shapes/Text";
+import { Transformer } from "./instances/common/Transformer";
 
 import Cookies from "js-cookie"
 
@@ -41,6 +42,8 @@ export class Render extends RenderProvider {
     public history: History;
     /** Smart snapping system for shapes. */
     public snapSmart: SnapSmart;
+    /** Transformer system for shapes. */
+    public transformer: Transformer;
 
     /** Serialized shape data for auto-save. */
     private _data: ShapeRawData[] = [];
@@ -83,6 +86,14 @@ export class Render extends RenderProvider {
     private _isPan: boolean = false
     /** Indicates if a shape is being dragged. */
     private _isDragging: boolean = false
+    /** Indicates if shift key is pressed for multi-selection. */
+    private _isShiftPressed: boolean = false
+    /** Indicates if dragging occurred during the current mouse interaction. */
+    private _wasDragging: boolean = false
+    /** Time when mouse down occurred. */
+    private _mouseDownTime: number = 0
+    /** Minimum time in milliseconds before dragging activates. */
+    private _dragThreshold: number = 150
 
     /** Current zoom factor. */
     private _zoom: number = 1
@@ -123,6 +134,7 @@ export class Render extends RenderProvider {
         this.currentCamera = new Camera(this)
         this.snapSmart = new SnapSmart(this)
         this.history = new History(this)
+        this.transformer = new Transformer(this)
 
         this.setup()
         this.start()
@@ -188,6 +200,9 @@ export class Render extends RenderProvider {
         if (event.key === "Control") {
             this._isZooming = true;
         }
+        if (event.key === "Shift") {
+            this._isShiftPressed = true;
+        }
     }
 
     /**
@@ -198,6 +213,9 @@ export class Render extends RenderProvider {
     private _onKeyUp(event: KeyboardEvent): void {
         if (event.key === "Control") {
             this._isZooming = false;
+        }
+        if (event.key === "Shift") {
+            this._isShiftPressed = false;
         }
     }
 
@@ -250,15 +268,19 @@ export class Render extends RenderProvider {
     private _onMouseDown(event: MouseEvent): void {
         this.emit("mousedown", this._getArgs(this))
 
-        this._draggingShape = this._getChildrens().find((child: Shape) => child._isClicked()) ?? null;
+        const clickedSelectedShape = this._getChildrens().find((child: Shape) => child._isClicked() && child.isSelected);
+        const clickedUnselectedShape = this._getChildrens().find((child: Shape) => child._isClicked() && !child.isSelected);
+        
+        if (clickedSelectedShape) {
+            return;
+        }
 
-        if (this._draggingShape) {
-            this._isDragging = true;
+        if (clickedUnselectedShape) {
+            this._draggingShape = clickedUnselectedShape;
+            this._isDragging = false;
+            this._wasDragging = false;
+            this._mouseDownTime = performance.now();
             this._lastMousePos = this.worldPosition();
-
-            if (this.configuration.config.snap) {
-                this.snapSmart.bind(this._draggingShape);
-            }
             return;
         }
 
@@ -279,12 +301,30 @@ export class Render extends RenderProvider {
         this._mousePosition.y = event.clientY
         if (!this.pointerInWorld(this.mousePosition())) return;
 
+        if (this.transformer.isDragging || this.transformer.isMovingSelection) {
+            this._isDragging = false;
+            this._draggingShape = null;
+        }
+
+        if (this._draggingShape && !this._isDragging) {
+            const currentTime = performance.now();
+            const timeSinceMouseDown = currentTime - this._mouseDownTime;
+            
+            if (timeSinceMouseDown >= this._dragThreshold) {
+                this._isDragging = true;
+                if (this.configuration.config.snap) {
+                    this.snapSmart.bind(this._draggingShape);
+                }
+            }
+        }
+
         if (this._isDragging && this._draggingShape) {
             const current = this.worldPosition();
             const delta = current.sub(this._lastMousePos);
             this._draggingShape.position.x += delta.x;
             this._draggingShape.position.y += delta.y;
             this._lastMousePos = current;
+            this._wasDragging = true;
 
             if (this.configuration.config.snap) {
                 this.snapSmart.update();
@@ -321,6 +361,7 @@ export class Render extends RenderProvider {
         this._isPan = false;
         this._draggingShape = null;
         this._lastMousePos = Vector.zero;
+        this._mouseDownTime = 0;
 
         if (this.configuration.config.snap) {
             this.snapSmart.unbind();
@@ -345,11 +386,31 @@ export class Render extends RenderProvider {
         const now = performance.now();
         const diff = now - this._lastTimeClick;
         if (diff < 300) {
-            if (clicked) (clicked as Shape).emit("dblclick", this._getArgs(clicked))
-            else this.emit("dblclick", this._getArgs(this))
+            if (clicked) {
+                (clicked as Shape).emit("dblclick", this._getArgs(clicked))
+                this.transformer.clear();
+                this.transformer.add(clicked);
+            } else {
+                this.emit("dblclick", this._getArgs(this))
+            }
             return;
         }
         this._lastTimeClick = performance.now();
+
+        if (clicked && !this._wasDragging) {
+            if ((clicked as Shape).isSelected) {
+                return;
+            }
+            
+            if (this._isShiftPressed) {
+                this.transformer.add(clicked as Shape);
+            } else {
+                this.transformer.clear();
+                this.transformer.add(clicked as Shape);
+            }
+        }
+
+        this._wasDragging = false;
 
         this.emit("click", this._getArgs(clicked ?? this))
     }
@@ -420,13 +481,18 @@ export class Render extends RenderProvider {
      * @private
      */
     private _showFps() : void {
+        this.ctx.save()
         const measureText = this.ctx.measureText(`FPS: ${this._fps.toFixed(2)}`);
         const textWidth = measureText.width;
         const textHeight = measureText.fontBoundingBoxAscent + measureText.fontBoundingBoxDescent;
         
+        this.ctx.translate(this.canvas.width - textWidth * 1.5 - 10, textHeight + 10);
+        
         this.ctx.fillStyle = "white";
         this.ctx.font = "16px Arial";
-        this.ctx.fillText(`FPS: ${this._fps.toFixed(2)}`, this.canvas.width - textWidth * 1.5 - 10, textHeight + 10);
+        this.ctx.fillText(`FPS: ${this._fps.toFixed(2)}`, 0, 0);
+        
+        this.ctx.restore()
     }
 
     /**
@@ -459,6 +525,7 @@ export class Render extends RenderProvider {
             this.snapSmart.drawGuides()
         }
 
+        this.transformer.update()
         this.ctx.restore()
 
         this.ctx.save()

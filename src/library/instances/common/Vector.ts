@@ -48,6 +48,14 @@ export class Vector {
     }
 
     /**
+     * Creates a deep copy of this vector with identical properties
+     * @returns A new Vector instance with the same configuration
+     */
+    public copy(): Vector {
+        return new Vector(this.x, this.y);
+    }
+
+    /**
      * Subtracts another vector from this vector
      * @param vector - The vector to subtract
      * @returns A new Vector representing the difference
