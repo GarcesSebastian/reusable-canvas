@@ -18,6 +18,7 @@ export class RenderProvider {
         "undo": [],
         "redo": [],
         "save": [],
+        "load": [],
         "copy": [],
         "cut": [],
         "paste": [],
@@ -44,6 +45,7 @@ export class RenderProvider {
     public on(event: "undo", callback: ListenerCallback<"undo">): void;
     public on(event: "redo", callback: ListenerCallback<"redo">): void;
     public on(event: "save", callback: ListenerCallback<"save">): void;
+    public on(event: "load", callback: ListenerCallback<"load">): void;
     public on(event: "copy", callback: ListenerCallback<"copy">): void;
     public on(event: "cut", callback: ListenerCallback<"cut">): void;
     public on(event: "paste", callback: ListenerCallback<"paste">): void;

@@ -31,10 +31,9 @@ export interface RenderConfigurationProps {
     history?: boolean,
     pan?: boolean,
     zoom?: boolean,
-    select?: boolean,
-    resize?: boolean,
     snap?: boolean,
     transform?: boolean,
+    selection?: boolean,
     save?: AutoSaveMethods,
     keywords?: Keys   
 }
@@ -77,10 +76,9 @@ export class RenderConfiguration {
             history: false,
             pan: false,
             zoom: false,
-            select: false,
-            resize: false,
             snap: false,
             transform: false,
+            selection: false,
             save: null,
             keywords: RenderConfiguration.defaultKeyWords()
         }
@@ -114,6 +112,42 @@ export class RenderConfiguration {
             
             if (keyMatch) {
                 event.preventDefault();
+
+                if (key === "save") {
+                    this._render.emit(key as RenderEventsType, { data: this._render.serialize() })
+                    return
+                }
+
+                if (key === "copy") {
+                    this._render.copyNodes()
+                    return;
+                }
+
+                if (key === "paste") {
+                    this._render.pasteNodes()
+                    return;
+                }
+
+                if (key === "top") {
+                    this._render.topNodes()
+                    return;
+                }
+
+                if (key === "bottom") {
+                    this._render.bottomNodes()
+                    return;
+                }
+
+                if (key === "front") {
+                    this._render.frontNodes()
+                    return;
+                }
+
+                if (key === "back") {
+                    this._render.backNodes()
+                    return;
+                }
+
                 this._render.emit(key as RenderEventsType, {});
             }
         }

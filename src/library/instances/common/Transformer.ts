@@ -12,6 +12,12 @@ export type NodeBox = { position: Vector; size: Vector };
 
 /** Interface defining transformer configuration options. */
 export interface ITransformer {
+    borderWidth?: number;
+    borderColor?: string;
+    nodeColor?: string;
+    nodeBorderWidth?: number;
+    nodeBorderColor?: string;
+    nodeSize?: number;
     padding?: Padding;
 }
 
@@ -36,6 +42,18 @@ export class Transformer implements ITransformer {
     public _childs: Map<string, Shape> = new Map();
     /** Padding around the transformer boundary for visual spacing. */
     public padding: Padding = { top: 0, right: 0, bottom: 0, left: 0 };
+    /** Configuration for the transformer's appearance. */
+    public borderWidth: number;
+    /** Configuration for the transformer's appearance. */
+    public borderColor: string;
+    /** Configuration for the transformer's appearance. */
+    public nodeColor: string;
+    /** Configuration for the transformer's appearance. */
+    public nodeBorderWidth: number;
+    /** Configuration for the transformer's appearance. */
+    public nodeBorderColor: string;
+    /** Configuration for the transformer's appearance. */
+    public nodeSize: number;
 
     /** Current position of the transformer's top-left corner. */
     private _position: Vector = new Vector(0, 0);
@@ -70,6 +88,12 @@ export class Transformer implements ITransformer {
     public constructor(render: Render, DataTransformer?: ITransformer) {
         this._render = render;
         this.padding = DataTransformer?.padding ?? { top: 0, right: 0, bottom: 0, left: 0 };
+        this.borderWidth = DataTransformer?.borderWidth ?? 2;
+        this.borderColor = DataTransformer?.borderColor ?? "#00ff00";
+        this.nodeColor = DataTransformer?.nodeColor ?? "#00ff00";
+        this.nodeBorderWidth = DataTransformer?.nodeBorderWidth ?? 2;
+        this.nodeBorderColor = DataTransformer?.nodeBorderColor ?? "#00ff00";
+        this.nodeSize = DataTransformer?.nodeSize ?? 10;
 
         this._setup();
     }
@@ -117,7 +141,7 @@ export class Transformer implements ITransformer {
      * @private
      */
     private _onMouseDown(): void {
-        if (this._childs.size === 0) return;
+        if (this._childs.size === 0 || !this._render.configuration.config.transform) return;
 
         const activeNode = this._isClickedAnyNode();
         if (activeNode) {
@@ -164,6 +188,7 @@ export class Transformer implements ITransformer {
      * @private
      */
     private _onMouseMove(): void {
+        if (!this._render.configuration.config.transform) return;
         const currentMousePos = this._render.worldPosition();
         
         if (this._isMovingSelection && !this._isDragging) {
@@ -235,6 +260,7 @@ export class Transformer implements ITransformer {
      * @private
      */
     private _onMouseUp(): void {
+        if (!this._render.configuration.config.transform) return;
         this._isDragging = false;
         this._isMovingSelection = false;
         this._activeNode = null;
@@ -247,15 +273,17 @@ export class Transformer implements ITransformer {
      * @private
      */
     private _onCanvasClick(): void {
-        if (this._childs.size === 0) return;
+        if (this._childs.size === 0 || !this._render.configuration.config.transform) return;
 
         const clickedOnTransformer = this._isClicked();
         const clickedOnNode = this._isClickedAnyNode();
         const clickedOnSelectedShape = this._isClickedOnSelectedShape();
 
-        if (!clickedOnTransformer && !clickedOnNode && !clickedOnSelectedShape) {
+        if (!clickedOnTransformer && !clickedOnNode && !clickedOnSelectedShape && !this._render.selection._justFinishedSelecting) {
             this.clear();
         }
+
+        this._render.selection._justFinishedSelecting = false;
     }
 
     /**
@@ -264,6 +292,7 @@ export class Transformer implements ITransformer {
      * @private
      */
     private _isClickedOnSelectedShape(): boolean {
+        if (!this._render.configuration.config.transform) return false;
         for (const shape of this._render.childrens.values()) {
             if (shape.isSelected && shape._isClicked()) {
                 return true;
@@ -390,7 +419,7 @@ export class Transformer implements ITransformer {
         this._nodesBoxTemplate.forEach((node: Vector, key: string) => {
             const posX = boxX + node.x * boxWidth;
             const posY = boxY + node.y * boxHeight;
-            this._nodesBox.set(key, { position: new Vector(posX, posY), size: new Vector(10, 10) });
+            this._nodesBox.set(key, { position: new Vector(posX, posY), size: new Vector(this.nodeSize, this.nodeSize) });
         })
     }
 
@@ -411,8 +440,8 @@ export class Transformer implements ITransformer {
 
         this._render.ctx.beginPath()
         this._render.ctx.rect(posX , posY, width, height)
-        this._render.ctx.strokeStyle = "#00ff00"
-        this._render.ctx.lineWidth = 2 / this._render.zoom
+        this._render.ctx.strokeStyle = this.borderColor
+        this._render.ctx.lineWidth = this.borderWidth / this._render.zoom
         this._render.ctx.stroke()
         this._render.ctx.closePath()
 
@@ -437,9 +466,9 @@ export class Transformer implements ITransformer {
                 node.size.x / this._render.zoom, 
                 node.size.y / this._render.zoom
             )
-            this._render.ctx.fillStyle = "#ffffff"
-            this._render.ctx.strokeStyle = "#ff0000"
-            this._render.ctx.lineWidth = 2 / this._render.zoom
+            this._render.ctx.fillStyle = this.nodeColor
+            this._render.ctx.strokeStyle = this.nodeBorderColor
+            this._render.ctx.lineWidth = this.nodeBorderWidth / this._render.zoom
             this._render.ctx.fill()
             this._render.ctx.stroke()
             this._render.ctx.closePath()
@@ -482,6 +511,20 @@ export class Transformer implements ITransformer {
         this._calculateNodesBox();
         this._updateBox();
         this._updateNodes();
+    }
+
+    /**
+     * Sets the configuration for the transformer.
+     * @param DataTransformer - The configuration object.
+     */
+    public setConfig (DataTransformer: ITransformer): void {
+        this.padding = DataTransformer?.padding ?? this.padding;
+        this.borderWidth = DataTransformer?.borderWidth ?? this.borderWidth;
+        this.borderColor = DataTransformer?.borderColor ?? this.borderColor;
+        this.nodeColor = DataTransformer?.nodeColor ?? this.nodeColor;
+        this.nodeSize = DataTransformer?.nodeSize ?? this.nodeSize;
+        this.nodeBorderWidth = DataTransformer?.nodeBorderWidth ?? this.nodeBorderWidth;
+        this.nodeBorderColor = DataTransformer?.nodeBorderColor ?? this.nodeBorderColor;
     }
 
     /**

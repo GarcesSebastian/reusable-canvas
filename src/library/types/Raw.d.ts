@@ -37,4 +37,6 @@ export type TextRawData = ShapeRawData & {
     borderWidth: number;
     borderColor: string;
     padding: { top: number; right: number; bottom: number; left: number };
+    width: number;
+    height: number;
 }

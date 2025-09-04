@@ -20,6 +20,20 @@ export interface SnapSides {
 }
 
 /**
+ * Interface representing the configuration for the snap smart system.
+ * @interface ISnapSmart
+ */
+export interface ISnapSmart {
+    color?: string;
+    colorViewport?: string;
+    lineWidth?: number;
+    lineDash?: number[];
+    snapFactor?: number;
+    snapTolerance?: number;
+    snapDistance?: number;
+}
+
+/**
  * Interface representing a vertical guide line for snapping.
  * Contains x position and the y-range (y1 to y2) for rendering.
  */
@@ -76,9 +90,11 @@ export class SnapSmart {
     private _bestY: { diff: number, side: "top" | "bottom" | "centerY" } | null = null;
 
     /** Maximum distance in pixels to consider for snapping. */
-    private _snapTolerance: number = 30;
+    private _snapTolerance: number;
     /** Smoothing factor for the snap animation (0-1). */
-    private _snapFactor: number = 0.005; 
+    private _snapFactor: number;
+    /** Distance in pixels to consider for snapping. */
+    private _snapDistance: number;
 
     /** List of horizontal snap candidates. */
     private _candidatesX: { diff: number, side: "left" | "right" | "centerX" }[] = [];
@@ -104,6 +120,17 @@ export class SnapSmart {
             }
             this.clearGuides();
         });
+
+        this._render.resize();
+        this._snapTolerance = 15;
+        this._snapFactor = 0.005;
+        this._snapDistance = this._render.toWorldCoordinates(new Vector(0, 0))
+            .sub(this._render.toWorldCoordinates(
+                new Vector(
+                    this._render.canvas.width,
+                    this._render.canvas.height
+                )
+            )).len();
     }
 
     /**
@@ -136,11 +163,10 @@ export class SnapSmart {
         
         this.clearGuides();
 
-        const diff = this._render.toWorldCoordinates(new Vector(0, 0)).sub(this._render.toWorldCoordinates(new Vector(this._render.canvas.width, this._render.canvas.height)));
         const childs = this._render.childs.filter((child: Shape) => child !== this._target && child.visible);
         const closestChild = childs.filter((child: Shape) => {
             const distance = this._target!.position.sub(child.position).len();
-            return distance < diff.len();
+            return distance < this._snapDistance;
         });
 
         closestChild.forEach((child: Shape) => {
@@ -152,7 +178,7 @@ export class SnapSmart {
                 const diff = value.value - targetSide.value;
                 const diffAbs = Math.abs(diff);
 
-                if (diffAbs < this._snapTolerance / 2) {
+                if (diffAbs < this._snapTolerance) {
                     if ((side === "left" && diff > 0) ||
                         (side === "right" && diff < 0) ||
                         (side === "top" && diff > 0) ||
@@ -332,6 +358,20 @@ export class SnapSmart {
     private clearGuides(): void {
         this._guideLinesX = [];
         this._guideLinesY = [];
+    }
+
+    /**
+     * Sets the configuration for the snap smart system.
+     * @param DataSnapSmart - The configuration object.
+     */
+    public setConfig(DataSnapSmart: ISnapSmart): void {
+        this.color = DataSnapSmart.color ?? this.color;
+        this.colorViewport = DataSnapSmart.colorViewport ?? this.colorViewport;
+        this.lineWidth = DataSnapSmart.lineWidth ?? this.lineWidth;
+        this.lineDash = DataSnapSmart.lineDash ?? this.lineDash;
+        this._snapFactor = DataSnapSmart.snapFactor ?? this._snapFactor;
+        this._snapTolerance = DataSnapSmart.snapTolerance ?? this._snapTolerance;
+        this._snapDistance = DataSnapSmart.snapDistance ?? this._snapDistance;
     }
 
     /**

@@ -1,6 +1,7 @@
 import type { Vector } from "../instances/common/Vector";
 import type { Shape } from "../instances/Shape";
 import type { Render } from "../Render";
+import { ShapeRawData } from "./Raw";
 
 export type RenderEventTemplate = {
     pointer: {
@@ -17,6 +18,8 @@ export type RenderEventMouseMove = RenderEventTemplate;
 export type RenderEventMouseDown = RenderEventTemplate;
 export type RenderEventMouseUp = RenderEventTemplate;
 export type RenderEventCreate = { shape: Shape };
+export type RenderEventSave = { data: ShapeRawData[] };
+export type RenderEventLoad = { data: ShapeRawData[] };
 
 export type RenderEventMap = {
     "click": RenderEventClick;
@@ -27,7 +30,8 @@ export type RenderEventMap = {
     "create": RenderEventCreate;
     "undo": RenderEventBlank;
     "redo": RenderEventBlank;
-    "save": RenderEventBlank;
+    "save": RenderEventSave;
+    "load": RenderEventLoad;
     "copy": RenderEventBlank;
     "cut": RenderEventBlank;
     "paste": RenderEventBlank;

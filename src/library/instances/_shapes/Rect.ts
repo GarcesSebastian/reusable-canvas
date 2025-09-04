@@ -78,10 +78,37 @@ export class Rect extends Shape {
      * @returns `true` if this rectangle overlaps the boundary area, otherwise `false`.
      */
     public _isShapeInBoundary(boundaryX: number, boundaryY: number, boundaryWidth: number, boundaryHeight: number): boolean {
-        return !(this.position.x + this.width < boundaryX || 
-            this.position.x > boundaryX + boundaryWidth ||
-            this.position.y + this.height < boundaryY || 
-            this.position.y > boundaryY + boundaryHeight);
+        const camera = this._render.currentCamera;
+        const current = this.position.sub(camera.offset);
+        
+        if (this.rotation === 0) {
+            return !(current.x + this.width < boundaryX || 
+                current.x > boundaryX + boundaryWidth ||
+                current.y + this.height < boundaryY || 
+                current.y > boundaryY + boundaryHeight);
+        }
+        
+        const corners = [
+            { x: 0, y: 0 },
+            { x: this.width, y: 0 },
+            { x: this.width, y: this.height },
+            { x: 0, y: this.height }
+        ];
+        
+        const cos = Math.cos(this.rotation);
+        const sin = Math.sin(this.rotation);
+        
+        for (const corner of corners) {
+            const rotatedX = current.x + corner.x * cos - corner.y * sin;
+            const rotatedY = current.y + corner.x * sin + corner.y * cos;
+            
+            if (rotatedX >= boundaryX && rotatedX <= boundaryX + boundaryWidth &&
+                rotatedY >= boundaryY && rotatedY <= boundaryY + boundaryHeight) {
+                return true;
+            }
+        }
+        
+        return false;
     }
 
     /**

@@ -478,7 +478,48 @@ export class Text extends Shape {
      * @param _boundaryHeight - Height of the boundary area (px).
      * @returns `true` if this text overlaps the boundary area, otherwise `false`.
      */
-    public _isShapeInBoundary(_boundaryX: number, _boundaryY: number, _boundaryWidth: number, _boundaryHeight: number): boolean {
+    public _isShapeInBoundary(boundaryX: number, boundaryY: number, boundaryWidth: number, boundaryHeight: number): boolean {
+        const camera = this._render.currentCamera;
+        const current = this.position.sub(camera.offset);
+        const offsetX = this._getTextOffsetX();
+        const offsetY = this._getTextOffsetY();
+        
+        const textX = current.x + offsetX - this.padding.left;
+        const textY = current.y + offsetY - this.padding.top;
+        const textWidth = this._width + this.padding.left + this.padding.right;
+        const textHeight = this._height + this.padding.top + this.padding.bottom;
+        
+        if (this.rotation === 0) {
+            return !(textX + textWidth < boundaryX || 
+                textX > boundaryX + boundaryWidth ||
+                textY + textHeight < boundaryY || 
+                textY > boundaryY + boundaryHeight);
+        }
+        
+        const corners = [
+            { x: textX, y: textY },
+            { x: textX + textWidth, y: textY },
+            { x: textX + textWidth, y: textY + textHeight },
+            { x: textX, y: textY + textHeight }
+        ];
+        
+        const cos = Math.cos(this.rotation);
+        const sin = Math.sin(this.rotation);
+        const centerX = current.x;
+        const centerY = current.y;
+        
+        for (const corner of corners) {
+            const dx = corner.x - centerX;
+            const dy = corner.y - centerY;
+            const rotatedX = centerX + dx * cos - dy * sin;
+            const rotatedY = centerY + dx * sin + dy * cos;
+            
+            if (rotatedX >= boundaryX && rotatedX <= boundaryX + boundaryWidth &&
+                rotatedY >= boundaryY && rotatedY <= boundaryY + boundaryHeight) {
+                return true;
+            }
+        }
+        
         return false;
     }
 
@@ -570,6 +611,8 @@ export class Text extends Shape {
             borderWidth: this.borderWidth,
             borderColor: this.borderColor,
             padding: this.padding,
+            width: this.width,
+            height: this.height
         }
     }
 
@@ -598,6 +641,8 @@ export class Text extends Shape {
         text.borderWidth = data.borderWidth;
         text.borderColor = data.borderColor;
         text.padding = data.padding;
+        text.width = data.width;
+        text.height = data.height;
 
         render.emit("create", { shape: text });
         

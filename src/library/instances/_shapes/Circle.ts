@@ -93,8 +93,11 @@ export class Circle extends Shape {
      * @returns `true` if the circle's bounding box overlaps the boundary, otherwise `false`.
      */
     public _isShapeInBoundary(boundaryX: number, boundaryY: number, boundaryWidth: number, boundaryHeight: number): boolean {
-        const shapeX = this.position.x - this.radius;
-        const shapeY = this.position.y - this.radius;
+        const camera = this._render.currentCamera;
+        const current = this.position.sub(camera.offset);
+        
+        const shapeX = current.x - this.radius;
+        const shapeY = current.y - this.radius;
         const shapeWidth = this.radius * 2;
         const shapeHeight = this.radius * 2;
         

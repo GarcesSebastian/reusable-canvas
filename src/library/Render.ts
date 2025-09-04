@@ -11,6 +11,8 @@ import { CircleRawData, RectRawData, ShapeRawData, TextRawData } from "./types/R
 import { Rect } from "./instances/_shapes/Rect";
 import { Circle } from "./instances/_shapes/Circle";
 import { Text } from "./instances/_shapes/Text";
+import { Selection } from "./instances/utils/Selection";
+import { v4 as uuidv4 } from "uuid";
 import { Transformer } from "./instances/common/Transformer";
 
 import Cookies from "js-cookie"
@@ -44,6 +46,8 @@ export class Render extends RenderProvider {
     public snapSmart: SnapSmart;
     /** Transformer system for shapes. */
     public transformer: Transformer;
+    /** Selection system for shapes. */
+    public selection: Selection;
 
     /** Serialized shape data for auto-save. */
     private _data: ShapeRawData[] = [];
@@ -53,7 +57,7 @@ export class Render extends RenderProvider {
     /** Bound rendering function to maintain the correct context. */
     private _renderBound: () => void = this._render.bind(this)
     /** Bound resize function to maintain the correct context. */
-    private _resizeBound: () => void = this._resize.bind(this)
+    private _resizeBound: () => void = this.resize.bind(this)
     /** Bound context menu function to maintain the correct context. */
     private _onContextmenuBound: (event: MouseEvent) => void = this._onContextmenu.bind(this);
 
@@ -135,6 +139,7 @@ export class Render extends RenderProvider {
         this.snapSmart = new SnapSmart(this)
         this.history = new History(this)
         this.transformer = new Transformer(this)
+        this.selection = new Selection(this)
 
         this.setup()
         this.start()
@@ -157,7 +162,7 @@ export class Render extends RenderProvider {
      * @private
      */
     private config(): void {
-        this._resize()
+        this.resize()
     }
 
     /**
@@ -181,10 +186,6 @@ export class Render extends RenderProvider {
         window.addEventListener("click", this._onMouseClickedBound)
     }
 
-    /**
-     * Sets up custom events.
-     * @private
-     */
     private _customEvents(): void {
         this.on("save", () => {
             this.autoSave(false);
@@ -266,27 +267,38 @@ export class Render extends RenderProvider {
      * @private
      */
     private _onMouseDown(event: MouseEvent): void {
-        this.emit("mousedown", this._getArgs(this))
+        const clickedSelectedShape = this._getChildrens().find((child: Shape) => child._isClicked());
 
-        const clickedSelectedShape = this._getChildrens().find((child: Shape) => child._isClicked() && child.isSelected);
-        const clickedUnselectedShape = this._getChildrens().find((child: Shape) => child._isClicked() && !child.isSelected);
+        if (event.button == 1 && this.configuration.config.pan) {
+            this._isPan = true;
+            this._lastMousePos = this.worldPosition();
+            return;
+        }
         
-        if (clickedSelectedShape) {
+        if (!clickedSelectedShape && this.configuration.config.selection) {
+            this.emit("mousedown", this._getArgs(this))
+            const worldPosition = this.worldPosition();
+            this.selection._startPosition = worldPosition;
+            this.selection._isSelecting = true;
+            this.selection._justFinishedSelecting = false;
             return;
         }
 
-        if (clickedUnselectedShape) {
-            this._draggingShape = clickedUnselectedShape;
+        if (!clickedSelectedShape) return;
+
+        this.emit("mousedown", this._getArgs(clickedSelectedShape))
+        
+        if (clickedSelectedShape && clickedSelectedShape.isSelected) {
+            return;
+        }
+
+        if (clickedSelectedShape && !clickedSelectedShape.isSelected) {
+            this._draggingShape = clickedSelectedShape;
             this._isDragging = false;
             this._wasDragging = false;
             this._mouseDownTime = performance.now();
             this._lastMousePos = this.worldPosition();
             return;
-        }
-
-        if (event.button == 1 && this.configuration.config.pan) {
-            this._isPan = true;
-            this._lastMousePos = this.worldPosition();
         }
     }
 
@@ -300,6 +312,13 @@ export class Render extends RenderProvider {
         this._mousePosition.x = event.clientX
         this._mousePosition.y = event.clientY
         if (!this.pointerInWorld(this.mousePosition())) return;
+
+        if (this.selection._isSelecting) {
+            this.selection._endPosition = this.worldPosition();
+            this.selection._width = this.selection._endPosition.x - this.selection._startPosition.x;
+            this.selection._height = this.selection._endPosition.y - this.selection._startPosition.y;
+            return;
+        }
 
         if (this.transformer.isDragging || this.transformer.isMovingSelection) {
             this._isDragging = false;
@@ -352,6 +371,20 @@ export class Render extends RenderProvider {
     private _onMouseUp(): void {
         this.emit("mouseup", this._getArgs(this))
 
+        if (this.selection._isSelecting) {
+            const distance = Math.sqrt(this.selection._width * this.selection._width + this.selection._height * this.selection._height);
+            if (distance >= this.selection._minDistance) {
+                this.selection.detectSelectedShapes();
+                this.selection._justFinishedSelecting = true;
+            }
+        }
+
+        this.selection._isSelecting = false;
+        this.selection._startPosition = Vector.zero;
+        this.selection._endPosition = Vector.zero;
+        this.selection._width = 0;
+        this.selection._height = 0;
+
         if (this._isDragging && this._draggingShape) {
             this._draggingShape.emit("dragend", this._getArgs(this._draggingShape))
             this.autoSave();
@@ -388,8 +421,11 @@ export class Render extends RenderProvider {
         if (diff < 300) {
             if (clicked) {
                 (clicked as Shape).emit("dblclick", this._getArgs(clicked))
-                this.transformer.clear();
-                this.transformer.add(clicked);
+
+                if (this.configuration.config.transform) {
+                    this.transformer.clear();
+                    this.transformer.add(clicked);
+                }
             } else {
                 this.emit("dblclick", this._getArgs(this))
             }
@@ -397,7 +433,7 @@ export class Render extends RenderProvider {
         }
         this._lastTimeClick = performance.now();
 
-        if (clicked && !this._wasDragging) {
+        if (clicked && !this._wasDragging && this.configuration.config.transform) {
             if ((clicked as Shape).isSelected) {
                 return;
             }
@@ -448,16 +484,6 @@ export class Render extends RenderProvider {
             },
             target: child,
         } as T
-    }
-
-    /**
-     * Adjusts the canvas size to match its visual size.
-     * @private
-     */
-    private _resize(): void {
-        const { width, height } = this.canvas.getBoundingClientRect()
-        this.canvas.width = width
-        this.canvas.height = height
     }
 
     /**
@@ -526,6 +552,7 @@ export class Render extends RenderProvider {
         }
 
         this.transformer.update()
+        this.selection.update()
         this.ctx.restore()
 
         this.ctx.save()
@@ -535,6 +562,14 @@ export class Render extends RenderProvider {
 
         this.emit("update", {})
         this._frameId = requestAnimationFrame(this._renderBound)
+    }
+
+    /**
+     * Gets the currently dragged shape.
+     * @returns The currently dragged shape, or null if no shape is being dragged.
+     */
+    public get draggingShape(): Shape | null {
+        return this._draggingShape;
     }
 
     /**
@@ -551,6 +586,15 @@ export class Render extends RenderProvider {
      */
     public get childs(): Shape[] {
         return this._getChildrens();
+    }
+
+    /**
+     * Adjusts the canvas size to match its visual size.
+     */
+    public resize(): void {
+        const { width, height } = this.canvas.getBoundingClientRect()
+        this.canvas.width = width
+        this.canvas.height = height
     }
 
     /**
@@ -615,6 +659,115 @@ export class Render extends RenderProvider {
     }
 
     /**
+     * Copies the nodes of the currently selected shapes to the clipboard.
+     * Each node is serialized and assigned a new unique ID.
+     * @returns void
+     */
+    public copyNodes(): void {
+        const serializedNodes = Array.from(this.transformer.childs.values()).map((child: Shape) => {
+            const rawData: ShapeRawData = child._rawData() as ShapeRawData;
+            rawData.id = uuidv4();
+            let width = 0;
+            if (rawData.type === "rect") {
+                width = (rawData as RectRawData).width;
+            } else if (rawData.type === "circle") {
+                width = (rawData as CircleRawData).radius * 2;
+            } else if (rawData.type === "text") {
+                width = (rawData as TextRawData).width;
+            }
+            
+            rawData.position = new Vector(rawData.position.x + width, rawData.position.y);
+            return rawData;
+        });
+        navigator.clipboard.writeText(JSON.stringify(serializedNodes))
+        .then(() => {
+            this.emit("copy", { data: serializedNodes });
+        })
+        .catch(err => {
+            console.error("Error al copiar: ", err);
+        });
+    }
+
+    /**
+     * Pastes the nodes from the clipboard into the canvas.
+     * Each node is deserialized and added to the canvas.
+     * @returns void
+     */
+    public pasteNodes(): void {
+        navigator.clipboard.readText()
+        .then(text => {
+            const parsedData = JSON.parse(text);
+            const shapes: Shape[] = [];
+            parsedData.forEach((child: ShapeRawData) => {
+                if (child.type === "rect") {
+                    shapes.push(Rect._fromRawData(child as RectRawData, this));
+                } else if (child.type === "circle") {
+                    shapes.push(Circle._fromRawData(child as CircleRawData, this));
+                } else if (child.type === "text") {
+                    shapes.push(Text._fromRawData(child as TextRawData, this));
+                }
+            });
+
+            this.emit("paste", { data: shapes });
+        })
+        .catch(err => {
+            console.error("Error al pegar: ", err);
+        });
+    }
+
+    /**
+     * Raises the selected nodes to the top of the canvas.
+     * @returns void
+     */
+    public topNodes(): void {
+        const nodes = [...this.transformer.childs.values()].map((child: Shape) => {
+            child.setTop();
+            return child;
+        });
+
+        this.emit("top", { data: nodes });
+    }
+
+    /**
+     * Raises the selected nodes to the bottom of the canvas.
+     * @returns void
+     */
+    public bottomNodes(): void {
+        const nodes = [...this.transformer.childs.values()].map((child: Shape) => {
+            child.setBottom();
+            return child;
+        });
+
+        this.emit("bottom", { data: nodes });
+    }
+
+    /**
+     * Raises the selected nodes to the front of the canvas.
+     * @returns void
+     */
+    public frontNodes(): void {
+        const nodes = [...this.transformer.childs.values()].map((child: Shape) => {
+            child.setFront();
+            return child;
+        });
+
+        this.emit("front", { data: nodes });
+    }
+
+    /**
+     * Raises the selected nodes to the back of the canvas.
+     * @returns void
+     */
+    public backNodes(): void {
+        const nodes = [...this.transformer.childs.values()].map((child: Shape) => {
+            child.setBack();
+            return child;
+        });
+
+        this.emit("back", { data: nodes });
+    }
+
+    /**
      * Undoes the last operation in history.
      */
     public undo(): void {
@@ -633,10 +786,10 @@ export class Render extends RenderProvider {
      * @param history - If true, adds the save to history; otherwise just saves without adding to history.
      */
     public autoSave(history: boolean = true): void {
-        if (!this.configuration.config.save) return;
         const newData = this.serialize();
         this._data = newData;
 
+        if (!this.configuration.config.save) return;
         if (this.configuration.config.save === "cookies") {
             Cookies.set("canvasData", JSON.stringify(newData));
         } else if (this.configuration.config.save === "localstorage") {
@@ -651,12 +804,13 @@ export class Render extends RenderProvider {
      * @param defaultData - Serialized shape data.
      */
     public load(defaultData?: ShapeRawData[]): void {
-        if (!this.configuration.config.save) return;
         if (defaultData) {
+            this.emit("load", { data: defaultData });
             this.deserialize(defaultData);
             return;
         }
-    
+
+        if (!this.configuration.config.save) return;
         if (typeof window === "undefined") {
             console.warn("Render.load(): No browser environment (localStorage/cookies not available).");
             return;
@@ -678,6 +832,7 @@ export class Render extends RenderProvider {
             }
     
             if (data && Array.isArray(data)) {
+                this.emit("load", { data });
                 this.deserialize(data);
             }
         } catch (error) {
