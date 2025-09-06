@@ -202,6 +202,8 @@ export class SnapSmart {
 
         const { left, top } = this._render.canvas.getBoundingClientRect();
         const viewportCenter = this._render.toWorldCoordinates(new Vector(this._render.canvas.width / 2, this._render.canvas.height / 2));
+        viewportCenter.x += this._render.currentCamera.offset.x;
+        viewportCenter.y += this._render.currentCamera.offset.y;
         
         const centerXDiff = left + viewportCenter.x - this._sides!["centerX"].value;
         const centerYDiff = top + viewportCenter.y - this._sides!["centerY"].value;
@@ -327,10 +329,11 @@ export class SnapSmart {
         const topLeft = this._render.toWorldCoordinates(new Vector(this._render.currentCamera.offset.x, this._render.currentCamera.offset.y + top));
         const bottomRight = this._render.toWorldCoordinates(new Vector(this._render.canvas.width + this._render.currentCamera.offset.x, this._render.canvas.height + this._render.currentCamera.offset.y + height));
 
+        const camera = this._render.currentCamera;
         const y1 = topLeft.y;
         const y2 = bottomRight.y;
         
-        this._guideLinesX.push({ x, y1, y2, isViewport: isViewport });
+        this._guideLinesX.push({ x: x - camera.offset.x, y1, y2, isViewport: isViewport });
     }
 
     /**
@@ -345,10 +348,11 @@ export class SnapSmart {
         const topLeft = this._render.toWorldCoordinates(new Vector(this._render.currentCamera.offset.x, this._render.currentCamera.offset.y));
         const bottomRight = this._render.toWorldCoordinates(new Vector(this._render.canvas.width + this._render.currentCamera.offset.x, this._render.canvas.height + this._render.currentCamera.offset.y));
         
+        const camera = this._render.currentCamera;
         const x1 = topLeft.x + left;
         const x2 = bottomRight.x + width;
         
-        this._guideLinesY.push({ y, x1, x2, isViewport: isViewport });
+        this._guideLinesY.push({ y: y - camera.offset.y, x1, x2, isViewport: isViewport });
     }
 
     /**
@@ -382,7 +386,6 @@ export class SnapSmart {
         if (!this._target) return;
         
         this._render.ctx.save();
-        this._render.ctx.translate(this._render.currentCamera.offset.x, this._render.currentCamera.offset.y);
 
         this._render.ctx.lineWidth = this.lineWidth / this._render.zoom;
         this._render.ctx.setLineDash(this.lineDash);
@@ -395,8 +398,8 @@ export class SnapSmart {
             }
             
             this._render.ctx.beginPath();
-            this._render.ctx.moveTo(guide.x, guide.y1);
-            this._render.ctx.lineTo(guide.x, guide.y2);
+            this._render.ctx.moveTo(guide.x, guide.y1 - this._render.currentCamera.offset.y);
+            this._render.ctx.lineTo(guide.x, guide.y2 - this._render.currentCamera.offset.y);
             this._render.ctx.stroke();
         });
         
@@ -408,8 +411,8 @@ export class SnapSmart {
             }
             
             this._render.ctx.beginPath();
-            this._render.ctx.moveTo(guide.x1, guide.y);
-            this._render.ctx.lineTo(guide.x2, guide.y);
+            this._render.ctx.moveTo(guide.x1 - this._render.currentCamera.offset.x, guide.y);
+            this._render.ctx.lineTo(guide.x2 - this._render.currentCamera.offset.x, guide.y);
             this._render.ctx.stroke();
         });
         
