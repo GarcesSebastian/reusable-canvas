@@ -635,6 +635,15 @@ export class Render extends RenderProvider {
     }
 
     /**
+     * Converts a world position to screen coordinates.
+     * @param vector - Vector with world coordinates.
+     * @returns Vector with screen coordinates.
+     */
+    public toScreenCoordinates(vector: Vector): Vector {
+        return new Vector(vector.x - this.currentCamera.offset.x, vector.y - this.currentCamera.offset.y);
+    }
+
+    /**
      * Converts a world position to absolute coordinates.
      * @param vector - Vector with world coordinates.
      * @returns Vector with absolute coordinates.

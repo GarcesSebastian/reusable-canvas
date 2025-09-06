@@ -435,11 +435,12 @@ export class Transformer implements ITransformer {
         const posY = this._position.y - this.padding.top;
         const width = this._width + this.padding.left + this.padding.right;
         const height = this._height + this.padding.top + this.padding.bottom;
+        const camera = this._render.currentCamera;
 
         this._render.ctx.save()
 
         this._render.ctx.beginPath()
-        this._render.ctx.rect(posX , posY, width, height)
+        this._render.ctx.rect(posX - camera.offset.x, posY - camera.offset.y, width, height)
         this._render.ctx.strokeStyle = this.borderColor
         this._render.ctx.lineWidth = this.borderWidth / this._render.zoom
         this._render.ctx.stroke()
@@ -455,14 +456,15 @@ export class Transformer implements ITransformer {
      */
     private _updateNodes(): void {
         if (this._childs.size === 0) return;
+        const camera = this._render.currentCamera;
 
         this._nodesBox.forEach((node: NodeBox) => {
             this._render.ctx.save()
 
             this._render.ctx.beginPath()
             this._render.ctx.rect(
-                node.position.x - (node.size.x / this._render.zoom) / 2, 
-                node.position.y - (node.size.y / this._render.zoom) / 2, 
+                node.position.x - (node.size.x / this._render.zoom) / 2 - camera.offset.x, 
+                node.position.y - (node.size.y / this._render.zoom) / 2 - camera.offset.y, 
                 node.size.x / this._render.zoom, 
                 node.size.y / this._render.zoom
             )
