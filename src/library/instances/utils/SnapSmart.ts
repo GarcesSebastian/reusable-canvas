@@ -202,8 +202,9 @@ export class SnapSmart {
 
         const { left, top } = this._render.canvas.getBoundingClientRect();
         const viewportCenter = this._render.toWorldCoordinates(new Vector(this._render.canvas.width / 2, this._render.canvas.height / 2));
-        viewportCenter.x += this._render.currentCamera.offset.x;
-        viewportCenter.y += this._render.currentCamera.offset.y;
+        const offset = this._render.getOffset();
+        viewportCenter.x += offset.x;
+        viewportCenter.y += offset.y;
         
         const centerXDiff = left + viewportCenter.x - this._sides!["centerX"].value;
         const centerYDiff = top + viewportCenter.y - this._sides!["centerY"].value;
@@ -325,15 +326,14 @@ export class SnapSmart {
      * @private
      */
     private addGuideLineX(x: number, isViewport: boolean = false): void {
-        const { height, top } = this._render.canvas.getBoundingClientRect();
-        const topLeft = this._render.toWorldCoordinates(new Vector(this._render.currentCamera.offset.x, this._render.currentCamera.offset.y + top));
-        const bottomRight = this._render.toWorldCoordinates(new Vector(this._render.canvas.width + this._render.currentCamera.offset.x, this._render.canvas.height + this._render.currentCamera.offset.y + height));
+        const offset = this._render.getOffset();
+        const topLeft = this._render.toWorldCoordinates(Vector.zero).add(offset);
+        const bottomRight = this._render.toWorldCoordinates(new Vector(this._render.canvas.width, this._render.canvas.height)).add(offset);
 
-        const camera = this._render.currentCamera;
         const y1 = topLeft.y;
         const y2 = bottomRight.y;
         
-        this._guideLinesX.push({ x: x - camera.offset.x, y1, y2, isViewport: isViewport });
+        this._guideLinesX.push({ x, y1, y2, isViewport: isViewport });
     }
 
     /**
@@ -344,15 +344,14 @@ export class SnapSmart {
      * @private
      */
     private addGuideLineY(y: number, isViewport: boolean = false): void {
-        const { width, left } = this._render.canvas.getBoundingClientRect();
-        const topLeft = this._render.toWorldCoordinates(new Vector(this._render.currentCamera.offset.x, this._render.currentCamera.offset.y));
-        const bottomRight = this._render.toWorldCoordinates(new Vector(this._render.canvas.width + this._render.currentCamera.offset.x, this._render.canvas.height + this._render.currentCamera.offset.y));
+        const offset = this._render.getOffset();
+        const topLeft = this._render.toWorldCoordinates(Vector.zero).add(offset);
+        const bottomRight = this._render.toWorldCoordinates(new Vector(this._render.canvas.width, this._render.canvas.height)).add(offset);
         
-        const camera = this._render.currentCamera;
-        const x1 = topLeft.x + left;
-        const x2 = bottomRight.x + width;
+        const x1 = topLeft.x;
+        const x2 = bottomRight.x;
         
-        this._guideLinesY.push({ y: y - camera.offset.y, x1, x2, isViewport: isViewport });
+        this._guideLinesY.push({ y, x1, x2, isViewport: isViewport });
     }
 
     /**
@@ -389,6 +388,7 @@ export class SnapSmart {
 
         this._render.ctx.lineWidth = this.lineWidth / this._render.zoom;
         this._render.ctx.setLineDash(this.lineDash);
+        const offset = this._render.getOffset();
 
         this._guideLinesX.forEach(guide => {
             if (guide.isViewport) {
@@ -398,8 +398,8 @@ export class SnapSmart {
             }
             
             this._render.ctx.beginPath();
-            this._render.ctx.moveTo(guide.x, guide.y1 - this._render.currentCamera.offset.y);
-            this._render.ctx.lineTo(guide.x, guide.y2 - this._render.currentCamera.offset.y);
+            this._render.ctx.moveTo(guide.x - offset.x, guide.y1 - offset.y);
+            this._render.ctx.lineTo(guide.x - offset.x, guide.y2 - offset.y);
             this._render.ctx.stroke();
         });
         
@@ -411,8 +411,8 @@ export class SnapSmart {
             }
             
             this._render.ctx.beginPath();
-            this._render.ctx.moveTo(guide.x1 - this._render.currentCamera.offset.x, guide.y);
-            this._render.ctx.lineTo(guide.x2 - this._render.currentCamera.offset.x, guide.y);
+            this._render.ctx.moveTo(guide.x1 - offset.x, guide.y - offset.y);
+            this._render.ctx.lineTo(guide.x2 - offset.x, guide.y - offset.y);
             this._render.ctx.stroke();
         });
         

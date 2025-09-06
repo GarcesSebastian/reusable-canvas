@@ -78,8 +78,7 @@ export class Rect extends Shape {
      * @returns `true` if this rectangle overlaps the boundary area, otherwise `false`.
      */
     public _isShapeInBoundary(boundaryX: number, boundaryY: number, boundaryWidth: number, boundaryHeight: number): boolean {
-        const camera = this._render.currentCamera;
-        const current = this.position.sub(camera.offset);
+        const current = this.position.sub(this._render.getOffset());
         
         if (this.rotation === 0) {
             return !(current.x + this.width < boundaryX || 
@@ -120,8 +119,7 @@ export class Rect extends Shape {
      */
     public _isClicked() : boolean {
         const mouseVector = this._render.worldPosition();
-        const camera = this._render.currentCamera;
-        const current = this.position.sub(camera.offset);
+        const current = this.position.sub(this._render.getOffset());
         
         if (this.rotation === 0) {
             return mouseVector.x >= current.x && 
@@ -157,8 +155,8 @@ export class Rect extends Shape {
     public draw(): void {
         if (!this.visible) return;
         this._ctx.save();
-        const camera = this._render.currentCamera;
-        this._ctx.translate(this.position.x - camera.offset.x, this.position.y - camera.offset.y);
+        const offset = this._render.getOffset();
+        this._ctx.translate(this.position.x - offset.x, this.position.y - offset.y);
         this._ctx.rotate(this.rotation);
 
         this._ctx.beginPath();

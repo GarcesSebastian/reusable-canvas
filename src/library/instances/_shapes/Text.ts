@@ -432,8 +432,7 @@ export class Text extends Shape {
      */
     public _isClicked(): boolean {
         const mouseVector = this._render.worldPosition();
-        const camera = this._render.currentCamera;
-        const current = this.position.sub(camera.offset);
+        const current = this.position.sub(this._render.getOffset());
 
         const offsetX = this._getTextOffsetX();
         const offsetY = this._getTextOffsetY();
@@ -479,8 +478,7 @@ export class Text extends Shape {
      * @returns `true` if this text overlaps the boundary area, otherwise `false`.
      */
     public _isShapeInBoundary(boundaryX: number, boundaryY: number, boundaryWidth: number, boundaryHeight: number): boolean {
-        const camera = this._render.currentCamera;
-        const current = this.position.sub(camera.offset);
+        const current = this.position.sub(this._render.getOffset());
         const offsetX = this._getTextOffsetX();
         const offsetY = this._getTextOffsetY();
         
@@ -537,10 +535,8 @@ export class Text extends Shape {
         this._calculateTextMetrics();
         
         this._ctx.save();
-        this._ctx.translate(
-            this.position.x - this._render.currentCamera.offset.x,
-            this.position.y - this._render.currentCamera.offset.y
-        );
+        const offset = this._render.getOffset();
+        this._ctx.translate(this.position.x - offset.x, this.position.y - offset.y);
         this._ctx.rotate(this.rotation);
     
         this._setupFont();

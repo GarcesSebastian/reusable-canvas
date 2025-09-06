@@ -83,6 +83,8 @@ export class Render extends RenderProvider {
     private _mousePosition: Vector = new Vector(0, 0)
     /** Last recorded mouse position. */
     private _lastMousePos: Vector = new Vector(0, 0)
+    /** Offset for panning. */
+    private _offsetPan: Vector = new Vector(0, 0)
 
     /** Indicates if zoom mode is active (Ctrl key pressed). */
     private _isZooming: boolean = false
@@ -253,10 +255,8 @@ export class Render extends RenderProvider {
                           (Math.abs(event.deltaY) < 50 && Math.abs(event.deltaY) > 0);
         
         if (isTouchpad && this.configuration.config.pan) {
-            this._getChildrens().forEach((child: Shape) => {
-                child.position.x -= event.deltaX;
-                child.position.y -= event.deltaY;
-            });
+            this._offsetPan.x += event.deltaX;
+            this._offsetPan.y += event.deltaY;
         }
     }
 
@@ -353,10 +353,8 @@ export class Render extends RenderProvider {
         if (this._isPan && this.configuration.config.pan) {
             const current = this.worldPosition();
             const delta = current.sub(this._lastMousePos);
-            this._getChildrens().forEach((child: Shape) => {
-                child.position.x += delta.x;
-                child.position.y += delta.y;
-            });
+            this._offsetPan.x += delta.x;
+            this._offsetPan.y += delta.y;
             this._lastMousePos = current;
         }
 
@@ -581,6 +579,14 @@ export class Render extends RenderProvider {
     }
 
     /**
+     * Gets the current offset pan.
+     * @returns The offset pan.
+     */
+    public get offsetPan(): Vector {
+        return this._offsetPan;
+    }
+
+    /**
      * Gets the list of all shapes present on the canvas.
      * @returns List of shapes ordered by zIndex.
      */
@@ -665,6 +671,14 @@ export class Render extends RenderProvider {
         const x = pointer.x - left
         const y = pointer.y - top
         return x >= 0 && x <= this.canvas.width && y >= 0 && y <= this.canvas.height
+    }
+
+    /**
+     * Gets the offset pan.
+     * @returns Vector with the offset pan.
+     */
+    public getOffset(): Vector {
+        return this.currentCamera.offset.sub(this._offsetPan);
     }
 
     /**
@@ -798,14 +812,14 @@ export class Render extends RenderProvider {
         const newData = this.serialize();
         this._data = newData;
 
+        if (history) this.history.save(this._data);
+
         if (!this.configuration.config.save) return;
         if (this.configuration.config.save === "cookies") {
             Cookies.set("canvasData", JSON.stringify(newData));
         } else if (this.configuration.config.save === "localstorage") {
             localStorage.setItem("canvasData", JSON.stringify(newData));
         }
-
-        if (history) this.history.save(this._data);
     }
 
     /**

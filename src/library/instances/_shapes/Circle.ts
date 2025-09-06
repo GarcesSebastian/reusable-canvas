@@ -63,8 +63,8 @@ export class Circle extends Shape {
     public draw() : void {
         if (!this.visible) return;
         this._ctx.save();
-        const camera = this._render.currentCamera;
-        this._ctx.translate(this.position.x - camera.offset.x, this.position.y - camera.offset.y);
+        const offset = this._render.getOffset();
+        this._ctx.translate(this.position.x - offset.x, this.position.y - offset.y);
         this._ctx.beginPath();
         this._ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
         this._ctx.fillStyle = this.color;
@@ -93,8 +93,7 @@ export class Circle extends Shape {
      * @returns `true` if the circle's bounding box overlaps the boundary, otherwise `false`.
      */
     public _isShapeInBoundary(boundaryX: number, boundaryY: number, boundaryWidth: number, boundaryHeight: number): boolean {
-        const camera = this._render.currentCamera;
-        const current = this.position.sub(camera.offset);
+        const current = this.position.sub(this._render.getOffset());
         
         const shapeX = current.x - this.radius;
         const shapeY = current.y - this.radius;
@@ -115,8 +114,7 @@ export class Circle extends Shape {
      */
     public _isClicked() : boolean {
         const mouseVector = this._render.worldPosition();
-        const camera = this._render.currentCamera;
-        const distance = mouseVector.sub(this.position.sub(camera.offset)).len();
+        const distance = mouseVector.sub(this.position.sub(this._render.getOffset())).len();
 
         return distance <= this.radius;
     }
