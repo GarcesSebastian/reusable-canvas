@@ -121,6 +121,8 @@ export class Render extends RenderProvider {
     public _maxZIndex: number = 0
     /** Minimum zIndex value of all shapes. */
     public _minZIndex: number = 0
+    /** Global scale of the canvas. */
+    public scale: number = 1
 
     /** Creator for shapes and elements. */
     public creator: RenderCreator;
@@ -247,6 +249,7 @@ export class Render extends RenderProvider {
                 this._zoom /= zoomFactor;
             }
         
+            this.scale = this._zoom
             const worldAfter = this.toWorldCoordinates(mouse);
         
             this._globalPosition.x += (worldAfter.x - worldBefore.x) * this._zoom;
@@ -680,6 +683,18 @@ export class Render extends RenderProvider {
         const x = vector.x * this._zoom + this._globalPosition.x
         const y = vector.y * this._zoom + this._globalPosition.y
         return new Vector(x + rect.left, y + rect.top)
+    }
+
+    /**
+     * Converts a world position to relative coordinates.
+     * @param vector - Vector with world coordinates.
+     * @returns Vector with relative coordinates.
+     */
+    public toRelativeCoordinates(vector: Vector): Vector {
+        const rect = this.canvas.getBoundingClientRect()
+        const x = vector.x
+        const y = vector.y
+        return new Vector(x - rect.left, y - rect.top)
     }
 
     /**

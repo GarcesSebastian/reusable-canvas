@@ -83,6 +83,15 @@ export class Vector {
     }
 
     /**
+     * Divides this vector by a scalar value
+     * @param scale - The scalar multiplier
+     * @returns A new Vector scaled by the given factor
+     */
+    public divScale(scale: number): Vector {
+        return new Vector(this.x / scale, this.y / scale);
+    }
+
+    /**
      * Multiplies this vector component-wise with another vector
      * @param vector - The vector to multiply with
      * @returns A new Vector with components multiplied

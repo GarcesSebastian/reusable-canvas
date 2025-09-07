@@ -201,27 +201,49 @@ export class Text extends Shape {
     private _updateEditor(): void {
         if (!this._textarea) return;
         
-        const position = this._render.toWorldCoordinates(this.position);
-        const offsetX = this._getTextOffsetX();
-        const offsetY = this._getTextOffsetY();
+        const worldPosition = this.position;
         
+        const absolutePosition = this._render.toAbsoluteCoordinates(worldPosition)
+            .sub(this._render.getOffset().scale(this._render.scale));
+        
+        const offsetX = this._getTextOffsetX();
+        const ascent = (this._ascent + this.padding.top + this.padding.bottom);
+
+        const paddingLeft = this.padding.left * this._render.scale;
+        const paddingTop = this.padding.top * this._render.scale;
+        
+        const rectX = offsetX - paddingLeft;
+        const rectY = paddingTop;
+        const rectW = this._width + this.padding.left + this.padding.right;
+        const rectH = this._height + this.padding.top + this.padding.bottom;
+
+        const scaledRectW = rectW * this._render.scale;
+        const scaledRectH = rectH * this._render.scale;
+        const scaledRectX = rectX;
+        const scaledRectY = rectY;
+
+        const finalPosition = new Vector(
+            absolutePosition.x + scaledRectX,
+            absolutePosition.y + scaledRectY
+        );
+
         this._textarea.value = this.value;
         this._textarea.style.position = "absolute";
-        this._textarea.style.left = `${position.x + offsetX - this.padding.left}px`;
-        this._textarea.style.top = `${position.y + offsetY - this.padding.top}px`;
-        this._textarea.style.width = `${this.width + this.padding.left + this.padding.right}px`;
-        this._textarea.style.minHeight = `${this.height + this.padding.top + this.padding.bottom}px`;
+        this._textarea.style.left = `${finalPosition.x}px`;
+        this._textarea.style.top = `${finalPosition.y - ascent * this._render.scale}px`;
+        this._textarea.style.width = `${scaledRectW}px`;
+        this._textarea.style.minHeight = `${scaledRectH}px`;
         this._textarea.style.zIndex = "1000";
-        this._textarea.style.border = `${this.borderWidth}px solid ${this.borderColor}`;
+        this._textarea.style.border = `${this.borderWidth * this._render.scale}px solid ${this.borderColor}`;
         this._textarea.style.outline = "none";
         this._textarea.style.resize = "none";
-        this._textarea.style.fontSize = `${this.fontSize}px`;
+        this._textarea.style.fontSize = `${this.fontSize * this._render.scale}px`;
         this._textarea.style.fontFamily = this.fontFamily;
         this._textarea.style.fontWeight = this.fontWeight;
         this._textarea.style.fontStyle = this.fontStyle;
         this._textarea.style.color = this.color;
         this._textarea.style.backgroundColor = this.backgroundColor;
-        this._textarea.style.padding = `0px ${this.padding.right / 2}px 0px ${this.padding.left / 2}px`;
+        this._textarea.style.padding = `0px ${(this.padding.right * this._render.scale) / 2}px 0px ${(this.padding.left * this._render.scale) / 2}px`;
         this._textarea.style.boxSizing = "border-box";
         this._textarea.style.overflow = "hidden";
         this._textarea.style.scrollbarWidth = "none";
@@ -243,12 +265,16 @@ export class Text extends Shape {
         
         const lines = this.value.split('\n');
         const lineCount = Math.max(1, lines.length);
+
+        const scaledFontSize = this.fontSize * 1.2 * this._render.scale;
+        const scaledPaddingTop = this.padding.top * this._render.scale;
+        const scaledPaddingBottom = this.padding.bottom * this._render.scale;
         
         if (lineCount === 1) {
-            const singleLineHeight = this.fontSize * 1.2 + this.padding.top / 2 + this.padding.bottom / 2;
+            const singleLineHeight = scaledFontSize + scaledPaddingTop / 2 + scaledPaddingBottom / 2;
             this._textarea.style.height = `${singleLineHeight}px`;
         } else {
-            this._textarea.style.height = `${this._textarea.scrollHeight + this.padding.top / 2 + this.padding.bottom / 2}px`;
+            this._textarea.style.height = `${this._textarea.scrollHeight + scaledPaddingTop / 2 + scaledPaddingBottom / 2}px`;
         }
     }
 
