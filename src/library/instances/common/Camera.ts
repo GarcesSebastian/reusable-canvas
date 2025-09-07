@@ -39,6 +39,14 @@ export class Camera {
     }
 
     /**
+     * Gets the instance that the camera is bound to.
+     * @returns The instance that the camera is bound to, or `null` if not bound.
+     */
+    public get instance(): Shape | null {
+        return this._instance;
+    }
+
+    /**
      * Updates camera position using linear interpolation if bound to a position.
      * Should be called on each animation frame.
      */

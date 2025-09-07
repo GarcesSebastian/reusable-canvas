@@ -508,6 +508,32 @@ export class Transformer implements ITransformer {
     }
 
     /**
+     * Checks if the transformer is empty (no shapes selected).
+     * @returns True if the transformer is empty, false otherwise.
+     */
+    public isEmpty(): boolean {
+        return this._childs.size === 0;
+    }
+
+    /**
+     * Checks if a shape is currently selected.
+     * @param shape - The shape to check.
+     * @returns True if the shape is selected, false otherwise.
+     */
+    public inTransformer(shape: Shape): boolean {
+        return this._childs.has(shape.id);
+    }
+
+    /**
+     * Checks if the mouse pointer is within the transformer boundary.
+     * Excludes clicks on transformation nodes.
+     * @returns True if clicking within transformer area, false otherwise.
+     */
+    public isClickedTransformer(): boolean {
+        return this._isClicked() || this._isClickedAnyNode() !== null;
+    }
+
+    /**
      * Updates and renders the transformer.
      * Recalculates bounds, node positions, and draws the transformer UI.
      * Should be called every frame when shapes are selected.

@@ -113,6 +113,8 @@ export class Render extends RenderProvider {
     /** Current frames per second. */
     private _fps: number = 0
 
+    /** Indicates whether to show FPS counter. */
+    public showFps: boolean = false;
     /** Global canvas position (for panning). */
     public _globalPosition: Vector = new Vector(0, 0)
     /** Maximum zIndex value of all shapes. */
@@ -235,7 +237,7 @@ export class Render extends RenderProvider {
         }
 
         if (this._isZooming && this.configuration.config.zoom) {
-            const zoomFactor = 1.1;
+            const zoomFactor = 1.05;
             const mouse = this.mousePosition();
             const worldBefore = this.toWorldCoordinates(mouse);
         
@@ -255,8 +257,8 @@ export class Render extends RenderProvider {
                           (Math.abs(event.deltaY) < 50 && Math.abs(event.deltaY) > 0);
         
         if (isTouchpad && this.configuration.config.pan) {
-            this._offsetPan.x += event.deltaX;
-            this._offsetPan.y += event.deltaY;
+            this._offsetPan.x -= event.deltaX;
+            this._offsetPan.y -= event.deltaY;
         }
     }
 
@@ -277,6 +279,7 @@ export class Render extends RenderProvider {
         
         if (!clickedSelectedShape && this.configuration.config.selection) {
             this.emit("mousedown", this._getArgs(this))
+            if (this.transformer.isClickedTransformer()) return;
             const worldPosition = this.worldPosition();
             this.selection._startPosition = worldPosition;
             this.selection._isSelecting = true;
@@ -554,8 +557,12 @@ export class Render extends RenderProvider {
         this.ctx.restore()
 
         this.ctx.save()
-        this._updateFps()
-        this._showFps()
+
+        if (this.showFps) {
+            this._updateFps()
+            this._showFps()
+        }
+        
         this.ctx.restore()
 
         this.emit("update", {})
@@ -592,6 +599,20 @@ export class Render extends RenderProvider {
      */
     public get childs(): Shape[] {
         return this._getChildrens();
+    }
+    
+    /**
+     * Allows the display of the FPS counter.
+     */
+    public allowFps(): void {
+        this.showFps = true;
+    }
+
+    /**
+     * Disallows the display of the FPS counter.
+     */
+    public disallowFps(): void {
+        this.showFps = false;
     }
 
     /**
