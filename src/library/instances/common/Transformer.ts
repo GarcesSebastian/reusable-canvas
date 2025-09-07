@@ -392,7 +392,7 @@ export class Transformer implements ITransformer {
             } else if (child instanceof Text) {
                 sizeX = child.width + child.padding.left + child.padding.right + child.borderWidth;
                 sizeY = child.height + child.padding.top + child.padding.bottom + child.borderWidth;
-                currentX = child.position.x - child.padding.left - child.borderWidth / 2;
+                currentX = child.position.x + child._getTextOffsetX() - child.padding.left - child.borderWidth / 2;
                 currentY = child.position.y - child.ascent - child.padding.top - child.borderWidth / 2;
             }
 
@@ -446,7 +446,7 @@ export class Transformer implements ITransformer {
         this._render.ctx.beginPath()
         this._render.ctx.rect(posX - offset.x, posY - offset.y, width, height)
         this._render.ctx.strokeStyle = this.borderColor
-        this._render.ctx.lineWidth = this.borderWidth / this._render.zoom
+        this._render.ctx.lineWidth = this.borderWidth / this._render.scale
         this._render.ctx.stroke()
         this._render.ctx.closePath()
 
@@ -467,14 +467,14 @@ export class Transformer implements ITransformer {
 
             this._render.ctx.beginPath()
             this._render.ctx.rect(
-                node.position.x - (node.size.x / this._render.zoom) / 2 - offset.x, 
-                node.position.y - (node.size.y / this._render.zoom) / 2 - offset.y, 
-                node.size.x / this._render.zoom, 
-                node.size.y / this._render.zoom
+                node.position.x - (node.size.x / this._render.scale) / 2 - offset.x, 
+                node.position.y - (node.size.y / this._render.scale) / 2 - offset.y, 
+                node.size.x / this._render.scale, 
+                node.size.y / this._render.scale
             )
             this._render.ctx.fillStyle = this.nodeColor
             this._render.ctx.strokeStyle = this.nodeBorderColor
-            this._render.ctx.lineWidth = this.nodeBorderWidth / this._render.zoom
+            this._render.ctx.lineWidth = this.nodeBorderWidth / this._render.scale
             this._render.ctx.fill()
             this._render.ctx.stroke()
             this._render.ctx.closePath()

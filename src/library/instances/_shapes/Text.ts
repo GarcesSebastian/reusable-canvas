@@ -338,10 +338,9 @@ export class Text extends Shape {
 
     /**
      * Calculate the horizontal offset based on text alignment.
-     * @private
      * @returns The x-offset in pixels for proper text alignment.
      */
-    private _getTextOffsetX(): number {
+    public _getTextOffsetX(): number {
         if (this.textAlign === "center") return -this._width / 2;
         if (this.textAlign === "right" || this.textAlign === "end") return -this._width;
         return 0;
@@ -349,10 +348,9 @@ export class Text extends Shape {
 
     /**
      * Calculate the vertical offset for proper text baseline alignment.
-     * @private
      * @returns The y-offset in pixels for proper text baseline alignment.
      */
-    private _getTextOffsetY(): number {
+    public _getTextOffsetY(): number {
         return -this._ascent;
     }
 
