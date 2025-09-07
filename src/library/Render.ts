@@ -7,10 +7,11 @@ import { RenderConfiguration, type RenderConfigurationProps } from "./helpers/Re
 import { Camera } from "./instances/common/Camera";
 import { History } from "./instances/utils/History";
 import { SnapSmart } from "./instances/utils/SnapSmart";
-import { CircleRawData, RectRawData, ShapeRawData, TextRawData } from "./types/Raw";
+import { CircleRawData, ImageRawData, RectRawData, ShapeRawData, TextRawData } from "./types/Raw";
 import { Rect } from "./instances/_shapes/Rect";
 import { Circle } from "./instances/_shapes/Circle";
 import { Text } from "./instances/_shapes/Text";
+import { Image } from "./instances/_shapes/Image";
 import { Selection } from "./instances/utils/Selection";
 import { Transformer } from "./instances/common/Transformer";
 
@@ -158,8 +159,6 @@ export class Render extends RenderProvider {
         this.config()
         this.events()
         this._customEvents()
-
-        this.load()
     }
 
     /**
@@ -783,6 +782,7 @@ export class Render extends RenderProvider {
             if (data && Array.isArray(data)) {
                 this.emit("load", { data });
                 this.deserialize(data);
+                this.history.save(data);
             }
         } catch (error) {
             console.error("Error loading canvas data:", error);
@@ -811,6 +811,8 @@ export class Render extends RenderProvider {
                 Circle._fromRawData(child as CircleRawData, this);
             } else if (child.type === "text") {
                 Text._fromRawData(child as TextRawData, this);
+            } else if (child.type === "image") {
+                Image._fromRawData(child as ImageRawData, this);
             }
         });
     }

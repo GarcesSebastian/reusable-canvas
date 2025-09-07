@@ -48,6 +48,15 @@ export class Vector {
     }
 
     /**
+     * Checks if this vector is equal to another vector
+     * @param vector - The vector to compare with
+     * @returns True if both vectors have the same components, false otherwise
+     */
+    public equals(vector: Vector): boolean {
+        return this.x === vector.x && this.y === vector.y;
+    }
+
+    /**
      * Creates a deep copy of this vector with identical properties
      * @returns A new Vector instance with the same configuration
      */

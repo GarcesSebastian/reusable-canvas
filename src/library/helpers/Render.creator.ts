@@ -3,6 +3,7 @@ import { Vector } from "../instances/common/Vector";
 import { Render } from "../Render";
 import { IRect, Rect } from "../instances/_shapes/Rect";
 import { IText, Text } from "../instances/_shapes/Text";
+import { IImage, Image } from "../instances/_shapes/Image";
 
 /**
  * Factory class for creating shapes and utility objects within a render context
@@ -53,6 +54,18 @@ export class RenderCreator {
         this._render.emit("create", { shape: text });
         this._render.autoSave();
         return text;
+    }
+
+    /**
+     * Creates a new image shape and emits creation event
+     * @param props - Configuration properties for the image
+     * @returns A new Image instance
+     */
+    public Image(props: IImage): Image {
+        const image = new Image(props, this._render);
+        this._render.emit("create", { shape: image });
+        this._render.autoSave();
+        return image;
     }
 
     /**

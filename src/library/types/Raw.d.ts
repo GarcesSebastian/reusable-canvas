@@ -1,6 +1,6 @@
 import type { Vector } from "../instances/common/Vector";
 
-export type ShapeType = "circle" | "rect" | "text";
+export type ShapeType = "circle" | "rect" | "text" | "image";
 
 export type ShapeRawData = {
     id: string;
@@ -39,4 +39,13 @@ export type TextRawData = ShapeRawData & {
     padding: { top: number; right: number; bottom: number; left: number };
     width: number;
     height: number;
+}
+
+export type ImageRawData = ShapeRawData & {
+    src: string;
+    width: number;
+    height: number;
+    borderWidth: number;
+    borderColor: string;
+    cornerRadius: number;
 }

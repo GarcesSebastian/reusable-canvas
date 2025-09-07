@@ -1,12 +1,13 @@
 import { Vector } from "../instances/common/Vector";
 import { Shape } from "../instances/Shape";
 import { Render } from "../Render";
-import { CircleRawData, RectRawData, ShapeRawData, TextRawData } from "../types/Raw";
+import { CircleRawData, ImageRawData, RectRawData, ShapeRawData, TextRawData } from "../types/Raw";
 import { v4 as uuidv4 } from "uuid";
 import type { RenderEventsType } from "../types/RenderProvider";
 import { Rect } from "../instances/_shapes/Rect";
 import { Circle } from "../instances/_shapes/Circle";
 import { Text } from "../instances/_shapes/Text";
+import { Image } from "../instances/_shapes/Image";
 
 /**
  * Interface defining keyboard shortcut mappings for canvas operations.
@@ -72,6 +73,10 @@ export class RenderConfiguration {
     /** Processed keyboard shortcuts mapped to actions. */
     private _keywords: RenderKeywords = {};
 
+    /** Store bound functions to ensure proper removal */
+    private _boundHandleKeyDown: (event: KeyboardEvent) => void;
+    private _boundPasteContent: (event: ClipboardEvent) => void;
+
     /**
      * Creates a new RenderConfiguration instance.
      * @param render - The main Render context.
@@ -89,6 +94,9 @@ export class RenderConfiguration {
             save: null,
             keywords: RenderConfiguration.defaultKeyWords()
         }
+
+        this._boundHandleKeyDown = this._handleKeyDown.bind(this);
+        this._boundPasteContent = this._pasteContent.bind(this);
 
         this.setup();
     }
@@ -118,7 +126,7 @@ export class RenderConfiguration {
                            keys.every(k => pressedKeys.includes(k.toLowerCase()));
             
             if (keyMatch) {
-                event.preventDefault();
+                if (key !== "paste") event.preventDefault();
 
                 if (key === "save") {
                     this._render.emit(key as RenderEventsType, { data: this._render.serialize() })
@@ -146,7 +154,6 @@ export class RenderConfiguration {
                 }
 
                 if (key === "paste") {
-                    this.pasteNodes()
                     return;
                 }
 
@@ -176,6 +183,65 @@ export class RenderConfiguration {
     }
 
     /**
+     * Handles paste events and processes the clipboard data.
+     * Detects pasted images and converts them to data URLs or object URLs.
+     * @param event - The paste event to handle.
+     * @private
+     */
+    private _pasteContent(event: ClipboardEvent): void {
+        event.preventDefault();
+        if (!event.clipboardData) return;
+
+        const items = Array.from(event.clipboardData.items);
+        
+        for (const item of items) {
+            if (item.type.startsWith('image/')) {
+                const file = item.getAsFile();
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const dataUrl = e.target?.result as string;
+                        this._render.creator.Image({
+                            src: dataUrl,
+                            position: new Vector(this._render.mousePosition().x, this._render.mousePosition().y),
+                            width: 100,
+                            height: 100,
+                        });
+                    };
+                    reader.readAsDataURL(file);
+                    
+                    return;
+                }
+            }
+        }
+
+        const textData = event.clipboardData.getData('text/plain');
+        if (textData) {
+            const imageUrlPattern = /^https?:\/\/.*\.(jpg|jpeg|png|gif|bmp|webp|svg)(\?.*)?$/i;
+            if (imageUrlPattern.test(textData.trim())) {
+                this._render.creator.Image({
+                    src: textData.trim(),
+                    position: new Vector(this._render.mousePosition().x, this._render.mousePosition().y),
+                    width: 100,
+                    height: 100,
+                });
+                return;
+            }
+        }
+
+        if (textData) {
+            try {
+                const parsedData = JSON.parse(textData);
+                if (Array.isArray(parsedData)) {
+                    this.pasteNodes(parsedData);
+                }
+            } catch(error) {
+                console.log(error);
+            }
+        }
+    }
+
+    /**
      * Sets up keyboard shortcuts and event listeners.
      * Processes string-based key combinations (e.g., "ctrl+z") into arrays (e.g., ["ctrl", "z"]).
      * @private
@@ -184,8 +250,12 @@ export class RenderConfiguration {
         Object.entries(this._config.keywords ?? {}).forEach(([key, value]) => {
             this._keywords[key] = value.split("+");
         });
-        document.removeEventListener("keydown", this._handleKeyDown);
-        document.addEventListener("keydown", this._handleKeyDown);
+        
+        document.removeEventListener("keydown", this._boundHandleKeyDown);
+        window.removeEventListener("paste", this._boundPasteContent);
+        
+        document.addEventListener("keydown", this._boundHandleKeyDown);
+        window.addEventListener("paste", this._boundPasteContent);
     }
 
     /**
@@ -206,6 +276,27 @@ export class RenderConfiguration {
     public get config(): RenderConfigurationProps {
         return this._config
     }
+
+    /**
+     * Deletes the nodes of the currently selected shapes.
+     * @returns void
+     */
+    public deleteNodes(): void {
+        const nodes = Array.from(this._render.transformer.childs.values());
+        nodes.forEach(node => node.destroy());
+        this._render.emit("delete", { data: nodes });
+        this._render.autoSave();
+    }
+
+    /**
+     * Selects all the nodes on the canvas.
+     * @returns void
+     */
+    public selectAllNodes(): void {
+        this._render.transformer.selectAll();
+        const nodes = Array.from(this._render.transformer.childs.values());
+        this._render.emit("selectAll", { data: nodes });
+    }
     
     /**
      * Cuts the nodes of the currently selected shapes.
@@ -220,6 +311,8 @@ export class RenderConfiguration {
                 (rawData as CircleRawData).radius * 2;
             } else if (rawData.type === "text") {
                 (rawData as TextRawData).width;
+            } else if (rawData.type === "image") {
+                (rawData as ImageRawData).width;
             }
             
             child.destroy();
@@ -229,29 +322,8 @@ export class RenderConfiguration {
         .then(() => {
             this._render.emit("cut", { data: serializedNodes });
         })
-        .catch(err => {
-            console.error("Error al cortar: ", err);
-        });
-    }
-
-    /**
-     * Deletes the nodes of the currently selected shapes.
-     * @returns void
-     */
-    public deleteNodes(): void {
-        const nodes = Array.from(this._render.transformer.childs.values());
-        nodes.forEach(node => node.destroy());
-        this._render.emit("delete", { data: nodes });
-    }
-
-    /**
-     * Selects all the nodes on the canvas.
-     * @returns void
-     */
-    public selectAllNodes(): void {
-        this._render.transformer.selectAll();
-        const nodes = Array.from(this._render.transformer.childs.values());
-        this._render.emit("selectAll", { data: nodes });
+        .catch(() => {});
+        this._render.autoSave();
     }
 
     /**
@@ -269,6 +341,8 @@ export class RenderConfiguration {
                 width = (rawData as CircleRawData).radius * 2;
             } else if (rawData.type === "text") {
                 width = (rawData as TextRawData).width;
+            } else if (rawData.type === "image") {
+                width = (rawData as ImageRawData).width;
             }
             
             rawData.position = new Vector(rawData.position.x + width, rawData.position.y);
@@ -278,9 +352,7 @@ export class RenderConfiguration {
         .then(() => {
             this._render.emit("copy", { data: serializedNodes });
         })
-        .catch(err => {
-            console.error("Error al copiar: ", err);
-        });
+        .catch(() => {});
     }
 
     /**
@@ -288,12 +360,10 @@ export class RenderConfiguration {
      * Each node is deserialized and added to the canvas.
      * @returns void
      */
-    public pasteNodes(): void {
-        navigator.clipboard.readText()
-        .then(text => {
-            const parsedData = JSON.parse(text);
+    public pasteNodes(data: ShapeRawData[]): void {
+        try {
             const shapes: Shape[] = [];
-            parsedData.forEach((child: ShapeRawData) => {
+            data.forEach((child: ShapeRawData) => {
                 child.id = uuidv4();
                 if (child.type === "rect") {
                     shapes.push(Rect._fromRawData(child as RectRawData, this._render));
@@ -301,14 +371,17 @@ export class RenderConfiguration {
                     shapes.push(Circle._fromRawData(child as CircleRawData, this._render));
                 } else if (child.type === "text") {
                     shapes.push(Text._fromRawData(child as TextRawData, this._render));
+                } else if (child.type === "image") {
+                    shapes.push(Image._fromRawData(child as ImageRawData, this._render));
                 }
             });
 
             this._render.emit("paste", { data: shapes });
-        })
-        .catch(err => {
-            console.error("Error al pegar: ", err);
-        });
+        } catch (error) {
+            console.log(error);
+        }
+
+        this._render.autoSave();
     }
 
     /**

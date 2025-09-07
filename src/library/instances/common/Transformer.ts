@@ -3,7 +3,9 @@ import { Shape } from "../Shape";
 import { Rect } from "../_shapes/Rect";
 import { Circle } from "../_shapes/Circle";
 import { Text } from "../_shapes/Text";
+import { Image } from "../_shapes/Image";
 import { Vector } from "../common/Vector";
+import { TransformerProvider } from "../../providers/Transformer.provider";
 
 /** Padding configuration for transformer boundaries. */
 export type Padding = { top: number; right: number; bottom: number; left: number };
@@ -34,7 +36,7 @@ export interface ITransformer {
  * // Now both shapes can be transformed together
  * ```
  */
-export class Transformer implements ITransformer {
+export class Transformer extends TransformerProvider {
     /** The rendering engine instance for drawing operations. */
     public _render: Render;
 
@@ -86,6 +88,7 @@ export class Transformer implements ITransformer {
      * @param DataTransformer - Optional configuration for transformer properties.
      */
     public constructor(render: Render, DataTransformer?: ITransformer) {
+        super();
         this._render = render;
         this.padding = DataTransformer?.padding ?? { top: 0, right: 0, bottom: 0, left: 0 };
         this.borderWidth = DataTransformer?.borderWidth ?? 2;
@@ -162,6 +165,9 @@ export class Transformer implements ITransformer {
                     data.width = child.width;
                     data.height = child.height;
                     data.fontSize = child.fontSize;
+                } else if (child instanceof Image) {
+                    data.width = child.width;
+                    data.height = child.height;
                 }
                 this._originalData.set(child.id, data);
             });
@@ -171,6 +177,8 @@ export class Transformer implements ITransformer {
                 height: this._height,
                 position: this._position.copy()
             };
+
+            this.emit("resizestart", {})
             return;
         }
 
@@ -179,6 +187,7 @@ export class Transformer implements ITransformer {
             this._isDragging = false;
             this._activeNode = null;
             this._lastMousePos = this._render.worldPosition();
+            this.emit("movestart", {})
         }
     }
 
@@ -196,6 +205,7 @@ export class Transformer implements ITransformer {
             this._childs.forEach(child => {
                 child.position = child.position.add(delta);
             });
+            this.emit("move", {})
             this._lastMousePos = currentMousePos;
             return;
         }
@@ -249,8 +259,13 @@ export class Transformer implements ITransformer {
                     child.radius = original.radius! * Math.max(scaleX, scaleY);
                 } else if (child instanceof Text) {
                     child.fontSize = original.fontSize! * Math.max(scaleX, scaleY);
+                } else if (child instanceof Image) {
+                    child.width = original.width! * scaleX;
+                    child.height = original.height! * scaleY;
                 }
             });
+
+            this.emit("resize", {})
         }
     }
 
@@ -265,6 +280,9 @@ export class Transformer implements ITransformer {
         this._isMovingSelection = false;
         this._activeNode = null;
         this._originalData.clear();
+        this.emit("moveend", {})
+        this.emit("resizeend", {})
+        this._render.autoSave();
     }
 
     /**
@@ -394,6 +412,11 @@ export class Transformer implements ITransformer {
                 sizeY = child.height + child.padding.top + child.padding.bottom + child.borderWidth;
                 currentX = child.position.x + child._getTextOffsetX() - child.padding.left - child.borderWidth / 2;
                 currentY = child.position.y - child.ascent - child.padding.top - child.borderWidth / 2;
+            } else if (child instanceof Image) {
+                sizeX = child.width;
+                sizeY = child.height;
+                currentX = child.position.x;
+                currentY = child.position.y;
             }
 
             minX = Math.min(minX, currentX);
