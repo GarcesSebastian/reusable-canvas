@@ -1,5 +1,12 @@
+import { Vector } from "../instances/common/Vector";
+import { Shape } from "../instances/Shape";
 import { Render } from "../Render";
+import { CircleRawData, RectRawData, ShapeRawData, TextRawData } from "../types/Raw";
+import { v4 as uuidv4 } from "uuid";
 import type { RenderEventsType } from "../types/RenderProvider";
+import { Rect } from "../instances/_shapes/Rect";
+import { Circle } from "../instances/_shapes/Circle";
+import { Text } from "../instances/_shapes/Text";
 
 /**
  * Interface defining keyboard shortcut mappings for canvas operations.
@@ -118,33 +125,48 @@ export class RenderConfiguration {
                     return
                 }
 
+                if (key === "delete") {
+                    this.deleteNodes()
+                    return;
+                }
+
+                if (key === "selectAll") {
+                    this.selectAllNodes()
+                    return;
+                }
+
+                if (key === "cut") {
+                    this.cutNodes()
+                    return;
+                }
+
                 if (key === "copy") {
-                    this._render.copyNodes()
+                    this.copyNodes()
                     return;
                 }
 
                 if (key === "paste") {
-                    this._render.pasteNodes()
+                    this.pasteNodes()
                     return;
                 }
 
                 if (key === "top") {
-                    this._render.topNodes()
+                    this.topNodes()
                     return;
                 }
 
                 if (key === "bottom") {
-                    this._render.bottomNodes()
+                    this.bottomNodes()
                     return;
                 }
 
                 if (key === "front") {
-                    this._render.frontNodes()
+                    this.frontNodes()
                     return;
                 }
 
                 if (key === "back") {
-                    this._render.backNodes()
+                    this.backNodes()
                     return;
                 }
 
@@ -183,6 +205,162 @@ export class RenderConfiguration {
      */
     public get config(): RenderConfigurationProps {
         return this._config
+    }
+    
+    /**
+     * Cuts the nodes of the currently selected shapes.
+     * @returns void
+     */
+    public cutNodes(): void {
+        const serializedNodes = Array.from(this._render.transformer.childs.values()).map((child: Shape) => {
+            const rawData: ShapeRawData = child._rawData() as ShapeRawData;
+            if (rawData.type === "rect") {
+                (rawData as RectRawData).width;
+            } else if (rawData.type === "circle") {
+                (rawData as CircleRawData).radius * 2;
+            } else if (rawData.type === "text") {
+                (rawData as TextRawData).width;
+            }
+            
+            child.destroy();
+            return rawData;
+        });
+        navigator.clipboard.writeText(JSON.stringify(serializedNodes))
+        .then(() => {
+            this._render.emit("cut", { data: serializedNodes });
+        })
+        .catch(err => {
+            console.error("Error al cortar: ", err);
+        });
+    }
+
+    /**
+     * Deletes the nodes of the currently selected shapes.
+     * @returns void
+     */
+    public deleteNodes(): void {
+        const nodes = Array.from(this._render.transformer.childs.values());
+        nodes.forEach(node => node.destroy());
+        this._render.emit("delete", { data: nodes });
+    }
+
+    /**
+     * Selects all the nodes on the canvas.
+     * @returns void
+     */
+    public selectAllNodes(): void {
+        this._render.transformer.selectAll();
+        const nodes = Array.from(this._render.transformer.childs.values());
+        this._render.emit("selectAll", { data: nodes });
+    }
+
+    /**
+     * Copies the nodes of the currently selected shapes to the clipboard.
+     * Each node is serialized and assigned a new unique ID.
+     * @returns void
+     */
+    public copyNodes(): void {
+        const serializedNodes = Array.from(this._render.transformer.childs.values()).map((child: Shape) => {
+            const rawData: ShapeRawData = child._rawData() as ShapeRawData;
+            let width = 0;
+            if (rawData.type === "rect") {
+                width = (rawData as RectRawData).width;
+            } else if (rawData.type === "circle") {
+                width = (rawData as CircleRawData).radius * 2;
+            } else if (rawData.type === "text") {
+                width = (rawData as TextRawData).width;
+            }
+            
+            rawData.position = new Vector(rawData.position.x + width, rawData.position.y);
+            return rawData;
+        });
+        navigator.clipboard.writeText(JSON.stringify(serializedNodes))
+        .then(() => {
+            this._render.emit("copy", { data: serializedNodes });
+        })
+        .catch(err => {
+            console.error("Error al copiar: ", err);
+        });
+    }
+
+    /**
+     * Pastes the nodes from the clipboard into the canvas.
+     * Each node is deserialized and added to the canvas.
+     * @returns void
+     */
+    public pasteNodes(): void {
+        navigator.clipboard.readText()
+        .then(text => {
+            const parsedData = JSON.parse(text);
+            const shapes: Shape[] = [];
+            parsedData.forEach((child: ShapeRawData) => {
+                child.id = uuidv4();
+                if (child.type === "rect") {
+                    shapes.push(Rect._fromRawData(child as RectRawData, this._render));
+                } else if (child.type === "circle") {
+                    shapes.push(Circle._fromRawData(child as CircleRawData, this._render));
+                } else if (child.type === "text") {
+                    shapes.push(Text._fromRawData(child as TextRawData, this._render));
+                }
+            });
+
+            this._render.emit("paste", { data: shapes });
+        })
+        .catch(err => {
+            console.error("Error al pegar: ", err);
+        });
+    }
+
+    /**
+     * Raises the selected nodes to the top of the canvas.
+     * @returns void
+     */
+    public topNodes(): void {
+        const nodes = [...this._render.transformer.childs.values()].map((child: Shape) => {
+            child.setTop();
+            return child;
+        });
+
+        this._render.emit("top", { data: nodes });
+    }
+
+    /**
+     * Raises the selected nodes to the bottom of the canvas.
+     * @returns void
+     */
+    public bottomNodes(): void {
+        const nodes = [...this._render.transformer.childs.values()].map((child: Shape) => {
+            child.setBottom();
+            return child;
+        });
+
+        this._render.emit("bottom", { data: nodes });
+    }
+
+    /**
+     * Raises the selected nodes to the front of the canvas.
+     * @returns void
+     */
+    public frontNodes(): void {
+        const nodes = [...this._render.transformer.childs.values()].map((child: Shape) => {
+            child.setFront();
+            return child;
+        });
+
+        this._render.emit("front", { data: nodes });
+    }
+
+    /**
+     * Raises the selected nodes to the back of the canvas.
+     * @returns void
+     */
+    public backNodes(): void {
+        const nodes = [...this._render.transformer.childs.values()].map((child: Shape) => {
+            child.setBack();
+            return child;
+        });
+
+        this._render.emit("back", { data: nodes });
     }
 
     /**

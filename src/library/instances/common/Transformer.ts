@@ -560,6 +560,14 @@ export class Transformer implements ITransformer {
     }
 
     /**
+     * Selects all shapes in the transformer selection.
+     */
+    public selectAll(): void {
+        this.clear();
+        this._render.childs.forEach(child => this.add(child));
+    }
+
+    /**
      * Adds a shape to the transformer selection.
      * @param child - The shape to add to the selection.
      */

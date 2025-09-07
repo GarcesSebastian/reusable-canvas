@@ -12,7 +12,6 @@ import { Rect } from "./instances/_shapes/Rect";
 import { Circle } from "./instances/_shapes/Circle";
 import { Text } from "./instances/_shapes/Text";
 import { Selection } from "./instances/utils/Selection";
-import { v4 as uuidv4 } from "uuid";
 import { Transformer } from "./instances/common/Transformer";
 
 import Cookies from "js-cookie"
@@ -715,115 +714,6 @@ export class Render extends RenderProvider {
      */
     public getOffset(): Vector {
         return this.currentCamera.offset.sub(this._offsetPan);
-    }
-
-    /**
-     * Copies the nodes of the currently selected shapes to the clipboard.
-     * Each node is serialized and assigned a new unique ID.
-     * @returns void
-     */
-    public copyNodes(): void {
-        const serializedNodes = Array.from(this.transformer.childs.values()).map((child: Shape) => {
-            const rawData: ShapeRawData = child._rawData() as ShapeRawData;
-            rawData.id = uuidv4();
-            let width = 0;
-            if (rawData.type === "rect") {
-                width = (rawData as RectRawData).width;
-            } else if (rawData.type === "circle") {
-                width = (rawData as CircleRawData).radius * 2;
-            } else if (rawData.type === "text") {
-                width = (rawData as TextRawData).width;
-            }
-            
-            rawData.position = new Vector(rawData.position.x + width, rawData.position.y);
-            return rawData;
-        });
-        navigator.clipboard.writeText(JSON.stringify(serializedNodes))
-        .then(() => {
-            this.emit("copy", { data: serializedNodes });
-        })
-        .catch(err => {
-            console.error("Error al copiar: ", err);
-        });
-    }
-
-    /**
-     * Pastes the nodes from the clipboard into the canvas.
-     * Each node is deserialized and added to the canvas.
-     * @returns void
-     */
-    public pasteNodes(): void {
-        navigator.clipboard.readText()
-        .then(text => {
-            const parsedData = JSON.parse(text);
-            const shapes: Shape[] = [];
-            parsedData.forEach((child: ShapeRawData) => {
-                if (child.type === "rect") {
-                    shapes.push(Rect._fromRawData(child as RectRawData, this));
-                } else if (child.type === "circle") {
-                    shapes.push(Circle._fromRawData(child as CircleRawData, this));
-                } else if (child.type === "text") {
-                    shapes.push(Text._fromRawData(child as TextRawData, this));
-                }
-            });
-
-            this.emit("paste", { data: shapes });
-        })
-        .catch(err => {
-            console.error("Error al pegar: ", err);
-        });
-    }
-
-    /**
-     * Raises the selected nodes to the top of the canvas.
-     * @returns void
-     */
-    public topNodes(): void {
-        const nodes = [...this.transformer.childs.values()].map((child: Shape) => {
-            child.setTop();
-            return child;
-        });
-
-        this.emit("top", { data: nodes });
-    }
-
-    /**
-     * Raises the selected nodes to the bottom of the canvas.
-     * @returns void
-     */
-    public bottomNodes(): void {
-        const nodes = [...this.transformer.childs.values()].map((child: Shape) => {
-            child.setBottom();
-            return child;
-        });
-
-        this.emit("bottom", { data: nodes });
-    }
-
-    /**
-     * Raises the selected nodes to the front of the canvas.
-     * @returns void
-     */
-    public frontNodes(): void {
-        const nodes = [...this.transformer.childs.values()].map((child: Shape) => {
-            child.setFront();
-            return child;
-        });
-
-        this.emit("front", { data: nodes });
-    }
-
-    /**
-     * Raises the selected nodes to the back of the canvas.
-     * @returns void
-     */
-    public backNodes(): void {
-        const nodes = [...this.transformer.childs.values()].map((child: Shape) => {
-            child.setBack();
-            return child;
-        });
-
-        this.emit("back", { data: nodes });
     }
 
     /**

@@ -213,5 +213,9 @@ export abstract class Shape extends ShapeProvider {
     public destroy() : void {
         this.emit("destroy", {});
         this._render.manager.removeChild(this);
+
+        if (this.render.transformer && this.render.transformer.inTransformer(this)) {
+            this.render.transformer.remove(this);
+        }
     }
 }
