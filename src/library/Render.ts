@@ -134,6 +134,17 @@ export class Render extends RenderProvider {
     /** Manager for renderer elements. */
     public manager: RenderManager;
 
+    /** Timeout para debounce del auto-save */
+    private _autoSaveTimeout: number | null = null;
+    /** Intervalo mínimo entre saves (en ms) */
+    private _autoSaveDelay: number = 500;
+    /** Flag para indicar si hay un save pendiente */
+    private _pendingSave: boolean = false;
+    /** Última data serializada para evitar saves innecesarios */
+    private _lastSerializedData: string | null = null;
+    /** Contador para logs de debug */
+    private _saveCounter: number = 0;
+
     /**
      * Creates a new renderer instance.
      * @param canvas - The HTML canvas element where rendering will be performed.
@@ -197,7 +208,7 @@ export class Render extends RenderProvider {
 
     private _customEvents(): void {
         this.on("save", () => {
-            this.autoSave(false);
+            this.forceSave();
         })
     }
 
@@ -273,7 +284,7 @@ export class Render extends RenderProvider {
      * @private
      */
     private _onMouseWheelEnd(): void {
-        this.autoSave(false);        
+        this.autoSave(false, false);        
     }
 
     /**
@@ -402,11 +413,11 @@ export class Render extends RenderProvider {
 
         if (this._isDragging && this._draggingShape) {
             this._draggingShape.emit("dragend", this._getArgs(this._draggingShape))
-            this.autoSave();
+            this.autoSave(true, false);
         }
 
         if (this._isPan) {
-            this.autoSave(false);
+            this.autoSave(false, false);
         }
 
         this._isDragging = false;
@@ -763,8 +774,18 @@ export class Render extends RenderProvider {
         return this.currentCamera.offset.sub(this._offsetPan);
     }
 
-    public async getSizeDatabase(): Promise<number> {
-        return await this._database?.getDatabaseSizeMB() ?? 0;
+    /**
+     * Método para forzar save inmediato (útil para casos específicos)
+     */
+    public forceSave(): void {
+        this.autoSave(true, true); // history=true, force=true
+    }
+
+    /**
+     * Método para configurar el delay del auto-save
+     */
+    public setAutoSaveDelay(delay: number): void {
+        this._autoSaveDelay = Math.max(100, delay); // Mínimo 100ms
     }
 
     /**
@@ -785,47 +806,148 @@ export class Render extends RenderProvider {
      * Automatically saves the current state of the canvas.
      * @param history - If true, adds the save to history; otherwise just saves without adding to history.
      */
-    public autoSave(history: boolean = true): void {
-        const newData = this.serialize();
-        this._data = newData;
+    public autoSave(history: boolean = true, force: boolean = false): void {
+        if (this._pendingSave && !force) {
+            return;
+        }
 
-        if (history) this.history.save(this._data);
+        if (this._autoSaveTimeout) {
+            clearTimeout(this._autoSaveTimeout);
+            this._autoSaveTimeout = null;
+        }
 
-        if (!this.configuration.config.save) return;
-        if (this.configuration.config.save === "localstorage") {
-            const sizeKB = new Blob([JSON.stringify(newData)]).size / 1024;
-            console.log(`Tamaño del estado: ${sizeKB.toFixed(2)} KB`);
-            localStorage.setItem("canvasData", JSON.stringify(newData));
-            localStorage.setItem("canvasConfiguration", JSON.stringify(this.getProperties()));
-        } else if (this.configuration.config.save === "indexeddb") {
-            const table = this._database?.getTable("nodes" as never);
-            if (!table) return;
+        if (force) {
+            this._executeSave(history);
+            return;
+        }
 
-            newData.forEach(async (data) => {
-                const hasData = await table.get(data.id as never);
-                if (hasData) {
-                    await table.update(data.id as never, data as never);
-                    return;
-                }
+        this._pendingSave = true;
+        this._autoSaveTimeout = window.setTimeout(() => {
+            this._executeSave(history);
+            this._pendingSave = false;
+            this._autoSaveTimeout = null;
+        }, this._autoSaveDelay);
+    }
 
-                await table.add(data as never);
-            });
+    /**
+     * Executes the save process.
+     * @param history - If true, adds the save to history; otherwise just saves without adding to history.
+     * @private
+     */
+    private async _executeSave(history: boolean): Promise<void> {
+        try {
+            const newData = await this._serializeAsync();
+            const serializedString = JSON.stringify(newData);
 
-            const handleConfiguration = async () => {
-                const configurationTable = this._database?.getTable("configurations" as never);
-                if (!configurationTable) return;
-
-                const hasData = await configurationTable.get("data" as never);
-                if (hasData) {
-                    await configurationTable.update("data" as never, { id: "data", ...this.getProperties() } as never);
-                    return;
-                }
-
-                await configurationTable.add({ id: "data", ...this.getProperties() } as never);
+            if (this._lastSerializedData === serializedString) {
+                return;
             }
 
-            handleConfiguration();
+            this._lastSerializedData = serializedString;
+            this._data = newData;
+            this._saveCounter++;
 
+            if (history) {
+                this.history.save(this._data);
+            }
+
+            if (!this.configuration.config.save) return;
+
+            if (this.configuration.config.save === "localstorage") {
+                await this._saveToLocalStorage(serializedString);
+            } else if (this.configuration.config.save === "indexeddb") {
+                await this._saveToIndexedDB(newData);
+            }
+
+        } catch (error) {
+            console.error('Error in autoSave:', error);
+            this._pendingSave = false;
+        }
+    }
+
+    /**
+     * Serializes the canvas data asynchronously.
+     * @private
+     */
+    private async _serializeAsync(): Promise<ShapeRawData[]> {
+        return new Promise((resolve) => {
+            if ('requestIdleCallback' in window) {
+                (window as any).requestIdleCallback(() => {
+                    resolve(this.serialize());
+                });
+            } else {
+                setTimeout(() => {
+                    resolve(this.serialize());
+                }, 0);
+            }
+        });
+    }
+
+    /**
+     * Save optimized for localStorage
+     * @private
+     */
+    private async _saveToLocalStorage(serializedString: string): Promise<void> {
+        const sizeKB = serializedString.length / 1024;
+        
+        if (this._saveCounter % 10 === 0) {
+            console.log(`Save #${this._saveCounter} - Size: ${sizeKB.toFixed(2)} KB`);
+        }
+
+        await new Promise<void>((resolve) => {
+            setTimeout(() => {
+                try {
+                    localStorage.setItem("canvasData", serializedString);
+                    localStorage.setItem("canvasConfiguration", JSON.stringify(this.getProperties()));
+                    resolve();
+                } catch (error) {
+                    console.error('Error saving to localStorage:', error);
+                    resolve();
+                }
+            }, 0);
+        });
+    }
+
+    /**
+     * Save optimized for IndexedDB using web workers
+     * @private
+     */
+    private async _saveToIndexedDB(newData: ShapeRawData[]): Promise<void> {
+        try {
+            const table = this._database?.getTable("nodes" as never);
+            const configurationTable = this._database?.getTable("configurations" as never);
+            
+            if (!configurationTable || !table) {
+                console.warn('Database tables not available');
+                return;
+            }
+
+            await Promise.all([
+                table.putMany(newData as never, true, 1000),
+                this._saveConfiguration(configurationTable)
+            ]);
+
+        } catch (error) {
+            console.error('Error saving to IndexedDB:', error);
+        }
+    }
+
+    /**
+     * Save configuration optimized
+     * @private
+     */
+    private async _saveConfiguration(configurationTable: any): Promise<void> {
+        try {
+            const configData = { id: "data", ...this.getProperties() };
+            const hasData = await configurationTable.get("data" as never);
+            
+            if (hasData) {
+                await configurationTable.update("data" as never, configData as never);
+            } else {
+                await configurationTable.add(configData as never);
+            }
+        } catch (error) {
+            console.error('Error saving configuration:', error);
         }
     }
 
@@ -876,6 +998,8 @@ export class Render extends RenderProvider {
                 this.deserialize(data);
                 this.history.save(data);
             }
+
+            this.database.getDatabaseSizeMB(true).then((size) => console.log(`Tamaño de la base de datos: ${size.toFixed(2)} MB`));
         } catch (error) {
             console.error("Error loading canvas data:", error);
         }
@@ -917,7 +1041,7 @@ export class Render extends RenderProvider {
         this.configuration.load(config)
         
         if (this.configuration.config.save === "indexeddb") {
-            this._database = new Database('myDatabase', 5);
+            this._database = new Database('myDatabase', 1);
 
             this._database.createTable<"nodes", NodeSchema>({
                 name: "nodes",
@@ -988,17 +1112,26 @@ export class Render extends RenderProvider {
      * Should be called before removing the renderer instance.
      */
     public destroy() : void {
+        if (this._autoSaveTimeout) {
+            clearTimeout(this._autoSaveTimeout);
+            this._autoSaveTimeout = null;
+        }
+        if (this._pendingSave) {
+            this.forceSave();
+        }
+
         this.stop();
         window.removeEventListener("resize", this._resizeBound);
         window.removeEventListener("change", this._resizeBound);
         window.removeEventListener("orientationchange", this._resizeBound);
         window.removeEventListener("visibilitychange", this._resizeBound);
-
-        window.removeEventListener("click", this._onMouseClickedBound)
-        window.removeEventListener("mousedown", this._onMouseDownBound)
-        window.removeEventListener("mousemove", this._onMouseMovedBound)
-        window.removeEventListener("mouseup", this._onMouseUpBound)
-        window.removeEventListener("keydown", this._onKeyDownBound)
-        window.removeEventListener("keyup", this._onKeyUpBound)
+        window.removeEventListener("contextmenu", this._onContextmenuBound);
+        window.removeEventListener("click", this._onMouseClickedBound);
+        window.removeEventListener("mousedown", this._onMouseDownBound);
+        window.removeEventListener("mousemove", this._onMouseMovedBound);
+        window.removeEventListener("mouseup", this._onMouseUpBound);
+        window.removeEventListener("keydown", this._onKeyDownBound);
+        window.removeEventListener("keyup", this._onKeyUpBound);
+        window.removeEventListener("wheel", this._onMouseWheelBound);
     }
 }
