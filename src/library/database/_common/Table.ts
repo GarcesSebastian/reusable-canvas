@@ -1,28 +1,72 @@
 import { Database, TableSchema } from "../Database";
 
+/** Basic table interface defining essential properties. */
 export interface ITable {
+    /** Name of the table/object store. */
     name: string;
+    /** Primary key field name. */
     primary: string;
 }
 
+/** Typed table interface with generic schema support. */
 export interface ITypedTable<T extends TableSchema = any> extends ITable {
+    /** Name of the table/object store. */
     name: string;
+    /** Primary key field name as a typed key of the schema. */
     primary: keyof T & string;
+    /** Optional schema definition for type safety. */
     schema?: T;
 }
 
+/**
+ * IndexedDB table wrapper providing type-safe database operations.
+ * Supports batch operations, worker-based processing, and comprehensive CRUD functionality.
+ * 
+ * @template TData - The schema type for records in this table.
+ * 
+ * @example
+ * ```ts
+ * interface UserSchema {
+ *     id: string;
+ *     name: string;
+ *     email: string;
+ * }
+ * 
+ * const userTable = new Table<UserSchema>({
+ *     name: 'users',
+ *     primary: 'id'
+ * }, database);
+ * 
+ * await userTable.init();
+ * await userTable.put({ id: '1', name: 'John', email: 'john@example.com' });
+ * ```
+ */
 export class Table<TData extends TableSchema = any> implements ITable {
+    /** Reference to the parent database instance. */
     public indexDB: Database<any>;
+    /** Name of the table/object store. */
     public name: string;
+    /** Primary key field name. */
     public primary: keyof TData & string;
+    /** Whether the table has been initialized. */
     private _initialized: boolean = false;
 
+    /**
+     * Creates a new Table instance.
+     * @param props - Table configuration including name and primary key.
+     * @param indexDB - Parent database instance.
+     */
     public constructor(props: ITypedTable<TData>, indexDB: Database<any>) {
         this.indexDB = indexDB;
         this.name = props.name;
         this.primary = props.primary;
     }
 
+    /**
+     * Initializes the table by verifying the object store exists.
+     * Must be called before performing any operations.
+     * @throws Error if the object store doesn't exist in the database.
+     */
     public async init(): Promise<void> {
         if (!this.indexDB.db.objectStoreNames.contains(this.name)) {
             throw new Error(`Object store '${this.name}' does not exist in database`);
@@ -30,18 +74,34 @@ export class Table<TData extends TableSchema = any> implements ITable {
         this._initialized = true;
     }
 
+    /**
+     * Ensures the table is initialized before operations.
+     * @private
+     * @throws Error if the table hasn't been initialized.
+     */
     private _ensureInitialized(): void {
         if (!this._initialized) {
             throw new Error(`Table '${this.name}' not initialized. Call init() first.`);
         }
     }
 
+    /**
+     * Gets an IndexedDB object store for the specified transaction mode.
+     * @private
+     * @param mode - Transaction mode (readonly or readwrite).
+     * @returns The object store instance.
+     */
     private _getStore(mode: IDBTransactionMode = 'readonly'): IDBObjectStore {
         this._ensureInitialized();
         const transaction = this.indexDB.db.transaction([this.name], mode);
         return transaction.objectStore(this.name);
     }
 
+    /**
+     * Retrieves a single record by its primary key.
+     * @param key - The primary key value to search for.
+     * @returns Promise resolving to the record or undefined if not found.
+     */
     public async get(key: TData[keyof TData & string]): Promise<TData | undefined> {
         return new Promise((resolve, reject) => {
             const store = this._getStore('readonly');
@@ -52,6 +112,12 @@ export class Table<TData extends TableSchema = any> implements ITable {
         });
     }
 
+    /**
+     * Retrieves multiple records by their primary keys.
+     * Automatically batches large requests for better performance.
+     * @param keys - Array of primary key values to retrieve.
+     * @returns Promise resolving to array of records (undefined for missing keys).
+     */
     public async getMany(keys: Array<TData[keyof TData & string]>): Promise<Array<TData | undefined>> {
         if (keys.length > 100) {
             const batchSize = 50;
@@ -70,6 +136,10 @@ export class Table<TData extends TableSchema = any> implements ITable {
         return Promise.all(promises);
     }
 
+    /**
+     * Retrieves all records from the table.
+     * @returns Promise resolving to array of all records.
+     */
     public async getAll(): Promise<TData[]> {
         return new Promise((resolve, reject) => {
             const store = this._getStore('readonly');
@@ -80,6 +150,11 @@ export class Table<TData extends TableSchema = any> implements ITable {
         });
     }
 
+    /**
+     * Retrieves records with an optional limit.
+     * @param limit - Maximum number of records to retrieve.
+     * @returns Promise resolving to array of records (up to limit).
+     */
     public async getAllWithLimit(limit?: number): Promise<TData[]> {
         return new Promise((resolve, reject) => {
             const store = this._getStore('readonly');
@@ -90,6 +165,11 @@ export class Table<TData extends TableSchema = any> implements ITable {
         });
     }
 
+    /**
+     * Inserts or updates a single record.
+     * @param data - The record to insert or update.
+     * @returns Promise resolving to the primary key of the saved record.
+     */
     public async put(data: TData): Promise<TData[keyof TData & string]> {
         return new Promise((resolve, reject) => {
             const store = this._getStore('readwrite');
@@ -100,6 +180,15 @@ export class Table<TData extends TableSchema = any> implements ITable {
         });
     }
 
+    /**
+     * Inserts or updates multiple records efficiently.
+     * Supports worker-based processing and progress callbacks for large datasets.
+     * @param dataArray - Array of records to insert or update.
+     * @param useWorker - Whether to use web worker for processing (default: true).
+     * @param batchSize - Number of records per batch (default: 100).
+     * @param onProgress - Optional progress callback function.
+     * @returns Promise resolving to array of primary keys for saved records.
+     */
     public async putMany(
         dataArray: TData[], 
         useWorker: boolean = true,
@@ -184,6 +273,12 @@ export class Table<TData extends TableSchema = any> implements ITable {
         return Promise.all(promises);
     }
 
+    /**
+     * Adds a new record to the table (fails if key already exists).
+     * @param data - The record to add.
+     * @returns Promise resolving to the primary key of the added record.
+     * @throws Error if a record with the same key already exists.
+     */
     public async add(data: TData): Promise<TData[keyof TData & string]> {
         return new Promise((resolve, reject) => {
             const store = this._getStore('readwrite');
@@ -194,6 +289,12 @@ export class Table<TData extends TableSchema = any> implements ITable {
         });
     }
 
+    /**
+     * Updates an existing record with partial data.
+     * @param key - The primary key of the record to update.
+     * @param updates - Partial data to merge with existing record.
+     * @returns Promise resolving to the updated record or null if not found.
+     */
     public async update(
         key: TData[keyof TData & string], 
         updates: Partial<TData>
@@ -206,6 +307,13 @@ export class Table<TData extends TableSchema = any> implements ITable {
         return updated;
     }
 
+    /**
+     * Updates multiple records efficiently with partial data.
+     * @param updates - Array of update operations with keys and partial data.
+     * @param useWorker - Whether to use web worker for processing (default: true).
+     * @param batchSize - Number of updates per batch (default: 50).
+     * @returns Promise resolving to array of updated records (null for missing keys).
+     */
     public async updateMany(
         updates: Array<{
             key: TData[keyof TData & string];
@@ -240,6 +348,11 @@ export class Table<TData extends TableSchema = any> implements ITable {
         return Promise.all(promises);
     }
 
+    /**
+     * Deletes a single record by its primary key.
+     * @param key - The primary key of the record to delete.
+     * @returns Promise that resolves when deletion is complete.
+     */
     public async delete(key: TData[keyof TData & string]): Promise<void> {
         return new Promise((resolve, reject) => {
             const store = this._getStore('readwrite');
@@ -250,6 +363,13 @@ export class Table<TData extends TableSchema = any> implements ITable {
         });
     }
 
+    /**
+     * Deletes multiple records efficiently by their primary keys.
+     * @param keys - Array of primary keys to delete.
+     * @param useWorker - Whether to use web worker for processing (default: true).
+     * @param batchSize - Number of deletions per batch (default: 50).
+     * @returns Promise that resolves when all deletions are complete.
+     */
     public async deleteMany(
         keys: Array<TData[keyof TData & string]>,
         useWorker: boolean = true,
@@ -314,6 +434,10 @@ export class Table<TData extends TableSchema = any> implements ITable {
         await Promise.all(promises);
     }
 
+    /**
+     * Removes all records from the table.
+     * @returns Promise that resolves when the table is cleared.
+     */
     public async clear(): Promise<void> {
         return new Promise((resolve, reject) => {
             const store = this._getStore('readwrite');
@@ -324,6 +448,10 @@ export class Table<TData extends TableSchema = any> implements ITable {
         });
     }
 
+    /**
+     * Counts the total number of records in the table.
+     * @returns Promise resolving to the record count.
+     */
     public async count(): Promise<number> {
         return new Promise((resolve, reject) => {
             const store = this._getStore('readonly');
@@ -334,11 +462,23 @@ export class Table<TData extends TableSchema = any> implements ITable {
         });
     }
 
+    /**
+     * Checks if a record exists with the given primary key.
+     * @param key - The primary key to check.
+     * @returns Promise resolving to true if record exists, false otherwise.
+     */
     public async exists(key: TData[keyof TData & string]): Promise<boolean> {
         const result = await this.get(key);
         return result !== undefined;
     }
 
+    /**
+     * Finds records matching a predicate function.
+     * @param predicate - Function to test each record.
+     * @param useWorker - Whether to use web worker for processing (default: true).
+     * @param limit - Optional maximum number of results to return.
+     * @returns Promise resolving to array of matching records.
+     */
     public async find(
         predicate: (item: TData) => boolean,
         useWorker: boolean = true,
@@ -389,6 +529,11 @@ export class Table<TData extends TableSchema = any> implements ITable {
         });
     }
 
+    /**
+     * Finds the first record matching a predicate function.
+     * @param predicate - Function to test each record.
+     * @returns Promise resolving to the first matching record or undefined if none found.
+     */
     public async findOne(
         predicate: (item: TData) => boolean,
     ): Promise<TData | undefined> {
@@ -416,6 +561,10 @@ export class Table<TData extends TableSchema = any> implements ITable {
         });
     }
 
+    /**
+     * Retrieves all primary keys from the table.
+     * @returns Promise resolving to array of all primary keys.
+     */
     public async getAllKeys(): Promise<Array<TData[keyof TData & string]>> {
         return new Promise((resolve, reject) => {
             const store = this._getStore('readonly');
@@ -426,6 +575,12 @@ export class Table<TData extends TableSchema = any> implements ITable {
         });
     }
 
+    /**
+     * Iterates over all records in the table, calling a callback for each.
+     * @param callback - Function to call for each record.
+     * @param batchSize - Number of records to process before yielding (default: 1000).
+     * @returns Promise that resolves when all records have been processed.
+     */
     public async forEach(
         callback: (item: TData, key: TData[keyof TData & string]) => void | Promise<void>,
         batchSize: number = 1000
@@ -459,6 +614,13 @@ export class Table<TData extends TableSchema = any> implements ITable {
         });
     }
 
+    /**
+     * Performs aggregation operations on all records in the table.
+     * @template TResult - The type of the aggregation result.
+     * @param aggregateFunction - Function that performs the aggregation on all records.
+     * @param useWorker - Whether to use web worker for processing (default: true).
+     * @returns Promise resolving to the aggregation result.
+     */
     public async aggregate<TResult = any>(
         aggregateFunction: (records: TData[]) => TResult,
         useWorker: boolean = true
@@ -484,6 +646,10 @@ export class Table<TData extends TableSchema = any> implements ITable {
         return aggregateFunction(allRecords);
     }
 
+    /**
+     * Calculates the storage size of all records in the table.
+     * @returns Promise resolving to the size in megabytes.
+     */
     public async getSize(): Promise<number> {
         const allRecords = await this.getAll();
         let totalBytes = 0;
@@ -505,6 +671,10 @@ export class Table<TData extends TableSchema = any> implements ITable {
         return totalBytes / (1024 * 1024);
     }
 
+    /**
+     * Retrieves comprehensive statistics about the table.
+     * @returns Promise resolving to table statistics including count, size, keys, and sample data.
+     */
     public async getStats(): Promise<{
         count: number;
         sizeMB: number;
@@ -526,6 +696,16 @@ export class Table<TData extends TableSchema = any> implements ITable {
         };
     }
 
+    /**
+     * Imports data into the table with optional progress tracking.
+     * @param data - Array of records to import.
+     * @param options - Import configuration options.
+     * @param options.batchSize - Number of records per batch (default: 1000).
+     * @param options.useWorker - Whether to use web worker (default: true).
+     * @param options.onProgress - Progress callback function.
+     * @param options.clearBeforeImport - Whether to clear table before import (default: false).
+     * @returns Promise that resolves when import is complete.
+     */
     public async import(
         data: TData[],
         options: {
@@ -562,6 +742,14 @@ export class Table<TData extends TableSchema = any> implements ITable {
         }
     }
 
+    /**
+     * Exports table data in JSON or CSV format with optional filtering.
+     * @param options - Export configuration options.
+     * @param options.format - Export format: 'json' or 'csv' (default: 'json').
+     * @param options.filter - Optional filter function to apply to records.
+     * @param options.limit - Optional maximum number of records to export.
+     * @returns Promise resolving to the exported data as a string.
+     */
     public async export(
         options: {
             format?: 'json' | 'csv';

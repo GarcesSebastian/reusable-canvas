@@ -3,15 +3,40 @@ import { Render } from "../../Render";
 import { ImageRawData } from "../../types/Raw";
 import { Vector } from "../common/Vector";
 
+/** Interface for image shape properties. */
 export interface IImage extends IShape {
+    /** Source URL of the image. */
     src: string;
+    /** Width of the image in pixels (optional, uses natural width if not specified). */
     width?: number;
+    /** Height of the image in pixels (optional, uses natural height if not specified). */
     height?: number;
+    /** Border width in pixels (default: 0). */
     borderWidth?: number;
+    /** Border color (default: "black"). */
     borderColor?: string;
+    /** Corner radius for rounded corners (default: 0). */
     cornerRadius?: number;
 }
 
+/**
+ * Image shape implementation for the rendering system.
+ * Supports loading images from URLs with automatic dimension detection,
+ * loading states, error handling, and styling options including borders and rounded corners.
+ * 
+ * @example
+ * ```ts
+ * const image = new Image({
+ *     src: "https://example.com/image.jpg",
+ *     position: new Vector(100, 100),
+ *     width: 200,
+ *     height: 150,
+ *     cornerRadius: 10,
+ *     borderWidth: 2,
+ *     borderColor: "blue"
+ * }, render);
+ * ```
+ */
 export class Image extends Shape {
     /** Canvas rendering context for drawing operations. */
     private _ctx: CanvasRenderingContext2D;
@@ -45,6 +70,12 @@ export class Image extends Shape {
     /** Rotation angle of the loading animation in radians. */
     private _rotationLoader: number = 0;
     
+    /**
+     * Creates a new Image shape instance.
+     * @param props - Image configuration including src, dimensions, and styling.
+     * @param render - The render context for drawing operations.
+     * @param id - Optional unique identifier for the shape.
+     */
     public constructor(props: IImage, render: Render, id?: string) {
         super(props, render, id);
 

@@ -1,298 +1,107 @@
 import { Table } from "./_common/Table";
 import { ITable } from "./_common/Table";
+import { getWorkerScript } from "./_common/WorkerScript";
 
+/** Generic table schema type for type safety. */
 export type TableSchema = Record<string, any>;
+
+/** Type helper for extracting table names from schema. */
 export type TableName<T extends Record<string, TableSchema>> = keyof T & string;
 
+/** Typed table interface with schema support. */
 export interface ITypedTable<T extends TableSchema = any> extends ITable {
+    /** Name of the table/object store. */
     name: string;
+    /** Primary key field name as a typed key of the schema. */
     primary: keyof T & string;
+    /** Optional schema definition for type safety. */
     schema?: T;
 }
 
+/** Response structure for web worker operations. */
 interface WorkerResponse {
+    /** Unique identifier for the operation. */
     id: string;
+    /** Whether the operation succeeded. */
     success: boolean;
+    /** Operation result data. */
     data?: any;
+    /** Error message if operation failed. */
     error?: string;
+    /** Progress information for long-running operations. */
     progress?: { p: number; state: boolean };
 }
 
+/**
+ * IndexedDB database wrapper with web worker support for high-performance operations.
+ * Provides type-safe table management and bulk operations with progress tracking.
+ * 
+ * @template TSchema - Database schema defining table structures.
+ * 
+ * @example
+ * ```ts
+ * interface MySchema {
+ *     users: { id: string; name: string; email: string };
+ *     posts: { id: string; title: string; content: string };
+ * }
+ * 
+ * const db = new Database<MySchema>('myapp', 1);
+ * await db.open();
+ * 
+ * const userTable = db.table('users', { name: 'users', primary: 'id' });
+ * await userTable.put({ id: '1', name: 'John', email: 'john@example.com' });
+ * ```
+ */
 export class Database<TSchema extends Record<string, TableSchema> = {}> {
+    /** The IndexedDB database instance. */
     private _db: IDBDatabase | null = null;
+    /** Web worker for background operations. */
     private _worker: Worker | null = null;
+    /** Map of pending worker operations with their promise resolvers. */
     private _workerPromises: Map<string, { resolve: (value: any) => void; reject: (error: any) => void; onProgress?: (progress: { p: number; state: boolean }) => void }> = new Map();
 
+    /** Database name. */
     public name: string;
+    /** Database version. */
     public version: number;
+    /** Map of initialized tables. */
     public tables: Map<string, Table<any>> = new Map();
+    /** Map of table configurations pending initialization. */
     private _pendingTables: Map<string, ITypedTable<any>> = new Map();
 
+    /**
+     * Creates a new Database instance.
+     * @param name - Database name.
+     * @param version - Database version (default: 1).
+     */
     public constructor(name: string, version: number = 1) {
         this.name = name;
         this.version = version;
         this._initWorker();
     }
 
+    /**
+     * Initializes the web worker for background database operations.
+     * Uses the external WorkerScript.ts file for better code organization.
+     * @private
+     */
     private _initWorker(): void {
-        const workerScript = `
-            let db = null;
-            let dbName = '';
-            let dbVersion = 1;
-
-            async function openDatabase(name, version) {
-                return new Promise((resolve, reject) => {
-                    const request = indexedDB.open(name, version);
-                    
-                    request.onsuccess = () => {
-                        db = request.result;
-                        resolve(db);
-                    };
-                    
-                    request.onerror = () => reject(request.error);
-                });
-            }
-
-            async function bulkInsert(tableName, dataArray, messageId) {
-                if (!db) throw new Error('Database not opened in worker');
-                
-                const total = dataArray.length;
-                let completed = 0;
-                const batchSize = 50;
-                const results = [];
-                
-                for (let i = 0; i < dataArray.length; i += batchSize) {
-                    const batch = dataArray.slice(i, i + batchSize);
-                    
-                    const transaction = db.transaction([tableName], 'readwrite');
-                    const store = transaction.objectStore(tableName);
-                    
-                    const batchPromises = batch.map(data => {
-                        return new Promise((resolve, reject) => {
-                            const request = store.put(data);
-                            request.onsuccess = () => {
-                                completed++;
-                                resolve(request.result);
-                            };
-                            request.onerror = () => reject(request.error);
-                        });
-                    });
-                    
-                    const batchResults = await Promise.all(batchPromises);
-                    results.push(...batchResults);
-                    
-                    const progress = completed / total;
-                    self.postMessage({
-                        id: messageId,
-                        success: true,
-                        progress: { p: progress, state: true }
-                    });
-                    
-                    if (i + batchSize < dataArray.length) {
-                        await new Promise(resolve => setTimeout(resolve, 50));
-                    }
-                }
-                
-                self.postMessage({
-                    id: messageId,
-                    success: true,
-                    progress: { p: 1, state: false }
-                });
-                
-                return results;
-            }
-
-            async function bulkUpdate(tableName, updates) {
-                if (!db) throw new Error('Database not opened in worker');
-                
-                const results = [];
-                const batchSize = 50;
-                
-                for (let i = 0; i < updates.length; i += batchSize) {
-                    const batch = updates.slice(i, i + batchSize);
-                    
-                    const transaction = db.transaction([tableName], 'readwrite');
-                    const store = transaction.objectStore(tableName);
-                    
-                    for (const update of batch) {
-                        const getRequest = await new Promise((resolve, reject) => {
-                            const req = store.get(update.key);
-                            req.onsuccess = () => resolve(req.result);
-                            req.onerror = () => reject(req.error);
-                        });
-                        
-                        if (getRequest) {
-                            const updatedData = { ...getRequest, ...update.data };
-                            const putResult = await new Promise((resolve, reject) => {
-                                const req = store.put(updatedData);
-                                req.onsuccess = () => resolve(req.result);
-                                req.onerror = () => reject(req.error);
-                            });
-                            results.push(putResult);
-                        }
-                    }
-                    
-                    if (i + batchSize < updates.length) {
-                        await new Promise(resolve => setTimeout(resolve, 10));
-                    }
-                }
-                
-                return results;
-            }
-
-            async function bulkDelete(tableName, keys) {
-                if (!db) throw new Error('Database not opened in worker');
-                
-                const batchSize = 50;
-                const results = [];
-                
-                for (let i = 0; i < keys.length; i += batchSize) {
-                    const batch = keys.slice(i, i + batchSize);
-                    
-                    const transaction = db.transaction([tableName], 'readwrite');
-                    const store = transaction.objectStore(tableName);
-                    
-                    const promises = batch.map(key => {
-                        return new Promise((resolve, reject) => {
-                            const request = store.delete(key);
-                            request.onsuccess = () => resolve(true);
-                            request.onerror = () => reject(request.error);
-                        });
-                    });
-                    
-                    const batchResults = await Promise.all(promises);
-                    results.push(...batchResults);
-                    
-                    if (i + batchSize < keys.length) {
-                        await new Promise(resolve => setTimeout(resolve, 10));
-                    }
-                }
-                
-                return results;
-            }
-
-            async function getDatabaseSize() {
-                if (!db) throw new Error('Database not opened in worker');
-                
-                let totalBytes = 0;
-                const storeNames = Array.from(db.objectStoreNames);
-                
-                for (const storeName of storeNames) {
-                    const transaction = db.transaction([storeName], 'readonly');
-                    const store = transaction.objectStore(storeName);
-                    
-                    const records = await new Promise((resolve, reject) => {
-                        const request = store.getAll();
-                        request.onsuccess = () => resolve(request.result);
-                        request.onerror = () => reject(request.error);
-                    });
-                    
-                    for (const record of records) {
-                        try {
-                            if (record instanceof Blob) {
-                                totalBytes += record.size;
-                            } else if (typeof record === "object") {
-                                totalBytes += new Blob([JSON.stringify(record)]).size;
-                            } else {
-                                totalBytes += new Blob([String(record)]).size;
-                            }
-                        } catch {
-                            totalBytes += 0;
-                        }
-                    }
-                }
-                
-                return totalBytes / (1024 * 1024);
-            }
-
-            async function complexQuery(tableName, queryType, params) {
-                if (!db) throw new Error('Database not opened in worker');
-                
-                const transaction = db.transaction([tableName], 'readonly');
-                const store = transaction.objectStore(tableName);
-                
-                switch (queryType) {
-                    case 'FILTER_LARGE_DATASET':
-                        const allRecords = await new Promise((resolve, reject) => {
-                            const request = store.getAll();
-                            request.onsuccess = () => resolve(request.result);
-                            request.onerror = () => reject(request.error);
-                        });
-                        
-                        const filterFn = new Function('record', 'params', params.filterCode);
-                        return allRecords.filter(record => filterFn(record, params.filterParams));
-                        
-                    case 'AGGREGATE':
-                        const records = await new Promise((resolve, reject) => {
-                            const request = store.getAll();
-                            request.onsuccess = () => resolve(request.result);
-                            request.onerror = () => reject(request.error);
-                        });
-                        
-                        const aggregateFn = new Function('records', 'params', params.aggregateCode);
-                        return aggregateFn(records, params.aggregateParams);
-                        
-                    default:
-                        throw new Error('Unknown query type');
-                }
-            }
-
-            self.onmessage = async function(event) {
-                const { id, type, payload } = event.data;
-                
-                try {
-                    let result;
-                    
-                    switch (type) {
-                        case 'INIT_DB':
-                            dbName = payload.name;
-                            dbVersion = payload.version;
-                            await openDatabase(dbName, dbVersion);
-                            result = 'Database initialized';
-                            break;
-                            
-                        case 'BULK_INSERT':
-                            result = await bulkInsert(payload.tableName, payload.data, id);
-                            break;
-                            
-                        case 'BULK_UPDATE':
-                            result = await bulkUpdate(payload.tableName, payload.updates);
-                            break;
-                            
-                        case 'BULK_DELETE':
-                            result = await bulkDelete(payload.tableName, payload.keys);
-                            break;
-                            
-                        case 'GET_SIZE':
-                            result = await getDatabaseSize();
-                            break;
-                            
-                        case 'COMPLEX_QUERY':
-                            result = await complexQuery(payload.tableName, payload.queryType, payload.params);
-                            break;
-                            
-                        default:
-                            throw new Error('Unknown message type: ' + type);
-                    }
-                    
-                    self.postMessage({
-                        id,
-                        success: true,
-                        data: result
-                    });
-                    
-                } catch (error) {
-                    self.postMessage({
-                        id,
-                        success: false,
-                        error: error.message
-                    });
-                }
-            };
-        `;
-
-        const blob = new Blob([workerScript], { type: 'application/javascript' });
+        // Get the worker script content from the external file
+        const workerScriptContent = getWorkerScript();
+        
+        // Create worker from the script content
+        const blob = new Blob([workerScriptContent], { type: 'application/javascript' });
         this._worker = new Worker(URL.createObjectURL(blob));
+        
+        this._setupWorkerHandlers();
+    }
+
+    /**
+     * Sets up worker message and error handlers.
+     * @private
+     */
+    private _setupWorkerHandlers(): void {
+        if (!this._worker) return;
         
         this._worker.onmessage = (event) => {
             const response: WorkerResponse = event.data;
@@ -321,6 +130,14 @@ export class Database<TSchema extends Record<string, TableSchema> = {}> {
         };
     }
 
+    /**
+     * Sends a message to the web worker and returns a promise for the result.
+     * @private
+     * @param type - The type of operation to perform.
+     * @param payload - The data to send to the worker.
+     * @param onProgress - Optional progress callback function.
+     * @returns Promise resolving to the worker operation result.
+     */
     private async _sendToWorker(type: string, payload: any, onProgress?: (progress: { p: number; state: boolean }) => void): Promise<any> {
         if (!this._worker) {
             throw new Error('Worker not initialized');
@@ -350,6 +167,11 @@ export class Database<TSchema extends Record<string, TableSchema> = {}> {
         });
     }
 
+    /**
+     * Opens the IndexedDB database and handles version upgrades.
+     * @private
+     * @returns Promise resolving to the opened database instance.
+     */
     private _open(): Promise<IDBDatabase> {
         return new Promise((resolve, reject) => {
             const request = indexedDB.open(this.name, this.version);
@@ -385,6 +207,10 @@ export class Database<TSchema extends Record<string, TableSchema> = {}> {
         });
     }
 
+    /**
+     * Initializes the database by opening it and setting up all pending tables.
+     * @returns Promise that resolves when initialization is complete.
+     */
     public async init(): Promise<void> {
         this._db = await this._open();
         
@@ -401,6 +227,14 @@ export class Database<TSchema extends Record<string, TableSchema> = {}> {
         this._pendingTables.clear();
     }
 
+    /**
+     * Creates a new table configuration (requires database reopen to take effect).
+     * @template TName - The name type of the table.
+     * @template TData - The schema type for the table.
+     * @param props - Table configuration including name, primary key, and schema.
+     * @returns Database instance with updated type schema.
+     * @throws Error if table already exists.
+     */
     public createTable<
         TName extends string,
         TData extends TableSchema
@@ -426,6 +260,14 @@ export class Database<TSchema extends Record<string, TableSchema> = {}> {
         return this as any;
     }
 
+    /**
+     * Adds a new table to the database and immediately initializes it.
+     * @template TName - The name type of the table.
+     * @template TData - The schema type for the table.
+     * @param props - Table configuration including name, primary key, and schema.
+     * @returns Promise resolving to database instance with updated type schema.
+     * @throws Error if table already exists.
+     */
     public async addTable<
         TName extends string,
         TData extends TableSchema
@@ -454,6 +296,12 @@ export class Database<TSchema extends Record<string, TableSchema> = {}> {
         return this as any;
     }
 
+    /**
+     * Retrieves a table instance by name.
+     * @template TName - The table name type.
+     * @param tableName - The name of the table to retrieve.
+     * @returns The table instance or null if not found.
+     */
     public get<TName extends TableName<TSchema>>(
         tableName: TName
     ): Table<TSchema[TName]> | null {
@@ -461,16 +309,36 @@ export class Database<TSchema extends Record<string, TableSchema> = {}> {
         return table || null;
     }
 
+    /**
+     * Alias for get() method - retrieves a table instance by name.
+     * @template TName - The table name type.
+     * @param name - The name of the table to retrieve.
+     * @returns The table instance or null if not found.
+     */
     public getTable<TName extends TableName<TSchema>>(
         name: TName
     ): Table<TSchema[TName]> | null {
         return this.get(name);
     }
 
+    /**
+     * Checks if a table exists in the database.
+     * @param name - The name of the table to check.
+     * @returns True if the table exists, false otherwise.
+     */
     public hasTable(name: string): boolean {
         return this.tables.has(name);
     }
 
+    /**
+     * Performs bulk insert operations on a table with optional progress tracking.
+     * @template TName - The table name type.
+     * @param tableName - The name of the table to insert into.
+     * @param dataArray - Array of records to insert.
+     * @param useWorker - Whether to use web worker for processing (default: true).
+     * @param onProgress - Optional progress callback function.
+     * @returns Promise resolving to array of primary keys for inserted records.
+     */
     public async bulkInsert<TName extends TableName<TSchema>>(
         tableName: TName,
         dataArray: TSchema[TName][],
@@ -493,6 +361,14 @@ export class Database<TSchema extends Record<string, TableSchema> = {}> {
         return table.putMany(dataArray, false, 100, onProgress);
     }
 
+    /**
+     * Performs bulk update operations on a table.
+     * @template TName - The table name type.
+     * @param tableName - The name of the table to update.
+     * @param updates - Array of update operations with keys and partial data.
+     * @param useWorker - Whether to use web worker for processing (default: true).
+     * @returns Promise resolving to array of update results.
+     */
     public async bulkUpdate<TName extends TableName<TSchema>>(
         tableName: TName,
         updates: Array<{
@@ -519,6 +395,14 @@ export class Database<TSchema extends Record<string, TableSchema> = {}> {
         return results;
     }
 
+    /**
+     * Performs bulk delete operations on a table.
+     * @template TName - The table name type.
+     * @param tableName - The name of the table to delete from.
+     * @param keys - Array of primary keys to delete.
+     * @param useWorker - Whether to use web worker for processing (default: true).
+     * @returns Promise that resolves when all deletions are complete.
+     */
     public async bulkDelete<TName extends TableName<TSchema>>(
         tableName: TName,
         keys: Array<TSchema[TName][keyof TSchema[TName] & string]>,
@@ -537,6 +421,11 @@ export class Database<TSchema extends Record<string, TableSchema> = {}> {
         await table.deleteMany(keys);
     }
 
+    /**
+     * Calculates the total size of the database in megabytes.
+     * @param useWorker - Whether to use web worker for processing (default: true).
+     * @returns Promise resolving to the database size in MB.
+     */
     public async getDatabaseSizeMB(useWorker: boolean = true): Promise<number> {
         if (useWorker) {
             return this._sendToWorker('GET_SIZE', {});
@@ -582,6 +471,15 @@ export class Database<TSchema extends Record<string, TableSchema> = {}> {
         return totalBytes / (1024 * 1024);
     }
 
+    /**
+     * Executes complex queries on a table using web workers for performance.
+     * @template TName - The table name type.
+     * @param tableName - The name of the table to query.
+     * @param queryType - Type of query: 'FILTER_LARGE_DATASET' or 'AGGREGATE'.
+     * @param params - Query parameters including filter/aggregate code and parameters.
+     * @param useWorker - Whether to use web worker for processing (default: true).
+     * @returns Promise resolving to the query result.
+     */
     public async complexQuery<TName extends TableName<TSchema>>(
         tableName: TName,
         queryType: 'FILTER_LARGE_DATASET' | 'AGGREGATE',
@@ -601,6 +499,11 @@ export class Database<TSchema extends Record<string, TableSchema> = {}> {
         return table.getAll();
     }
 
+    /**
+     * Gets the underlying IndexedDB database instance.
+     * @returns The IndexedDB database instance.
+     * @throws Error if database is not initialized.
+     */
     public get db(): IDBDatabase {
         if (!this._db) {
             throw new Error("Database not initialized. Call init() first.");
@@ -608,6 +511,10 @@ export class Database<TSchema extends Record<string, TableSchema> = {}> {
         return this._db;
     }
 
+    /**
+     * Closes the database connection and terminates the web worker.
+     * @returns Promise that resolves when the database is closed.
+     */
     public async close(): Promise<void> {
         if (this._worker) {
             this._worker.terminate();
@@ -620,6 +527,10 @@ export class Database<TSchema extends Record<string, TableSchema> = {}> {
         }
     }
 
+    /**
+     * Deletes the entire database from IndexedDB.
+     * @returns Promise that resolves when the database is deleted.
+     */
     public async deleteDatabase(): Promise<void> {
         await this.close();
         
@@ -630,6 +541,10 @@ export class Database<TSchema extends Record<string, TableSchema> = {}> {
         });
     }
 
+    /**
+     * Retrieves all table instances as a typed object.
+     * @returns Object containing all table instances keyed by table name.
+     */
     public getAllTables(): { [K in TableName<TSchema>]: Table<TSchema[K]> } {
         const result: any = {};
         for (const [name, table] of this.tables) {
@@ -638,6 +553,10 @@ export class Database<TSchema extends Record<string, TableSchema> = {}> {
         return result;
     }
 
+    /**
+     * Retrieves the names of all tables in the database.
+     * @returns Array of table names.
+     */
     public getTableNames(): Array<TableName<TSchema>> {
         return Array.from(this.tables.keys()) as Array<TableName<TSchema>>;
     }

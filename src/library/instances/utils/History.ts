@@ -43,6 +43,11 @@ export class History {
         })
     }
 
+    /**
+     * Saves the current canvas state to the history stack.
+     * Clears any future history if saving from a point in the past.
+     * @param data - Array of shape raw data representing the current canvas state.
+     */
     public save(data: ShapeRawData[]): void {
         this._index++;
         

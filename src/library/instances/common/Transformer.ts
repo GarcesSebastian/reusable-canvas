@@ -136,8 +136,22 @@ export class Transformer extends TransformerProvider {
     private _events(): void {
         this._render.on("mousedown", this._onMouseDown.bind(this));
         this._render.on("click", this._onCanvasClick.bind(this));
+        window.addEventListener("keydown", this._onKeyDown.bind(this));
         window.addEventListener("mousemove", this._onMouseMove.bind(this));
         window.addEventListener("mouseup", this._onMouseUp.bind(this));
+    }
+
+    /**
+     * Handles keydown events for transformer-specific actions.
+     * Currently supports only the Escape key to clear the transformer.
+     * @private
+     */
+    private _onKeyDown(e: KeyboardEvent): void {
+        if (this._childs.size === 0 || !this._render.configuration.config.transform) return;
+
+        if (e.key === "Escape") {
+            this.clear();
+        }
     }
 
     /**

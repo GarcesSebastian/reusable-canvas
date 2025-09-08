@@ -564,9 +564,8 @@ export class Render extends RenderProvider {
     /**
      * Main rendering function called on each animation frame.
      * Updates the camera, renders all shapes, and displays the FPS.
-     * @private
      */
-    private _render(): void {
+    public _render(): void {
         this._clear()
 
         this.ctx.save()
@@ -663,7 +662,15 @@ export class Render extends RenderProvider {
      * @param properties - Object containing the properties to set.
      */
     public setProperties(props: Partial<RenderProperties>) {
-        Object.assign(this, props);
+        if (props.zoom !== undefined) {
+            this._zoom = props.zoom;
+        }
+        if (props.globalPosition !== undefined) {
+            this._globalPosition = props.globalPosition;
+        }
+        if (props.offsetPan !== undefined) {
+            this._offsetPan = props.offsetPan;
+        }
     }
 
     /**
