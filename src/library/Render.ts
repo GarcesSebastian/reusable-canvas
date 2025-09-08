@@ -662,8 +662,6 @@ export class Render extends RenderProvider {
         if (properties.zoom) this._zoom = properties.zoom;
         if (properties.globalPosition) this._globalPosition = properties.globalPosition;
         if (properties.offsetPan) this._offsetPan = properties.offsetPan;
-
-        console.log(this._zoom, this._globalPosition, this._offsetPan);
     }
 
     public getProperties(): RenderProperties {
