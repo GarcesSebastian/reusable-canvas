@@ -42,16 +42,6 @@ export class Image extends Shape {
     /** Whether the image has failed to load. */
     private _error: boolean = false;
 
-    /** Alpha value for the loading animation. */
-    private _loadingAlpha: number = 0;
-    /** Direction of alpha animation during loading. */
-    private _alphaDirection: "up" | "down" = "up";
-    /** Minimum alpha value for loading animation. */
-    private _minAlpha: number = 0.2;
-    /** Maximum alpha value for loading animation. */
-    private _maxAlpha: number = 0.8;
-    /** Speed of the alpha animation. */
-    private _alphaSpeed: number = 0.05;
     /** Rotation angle of the loading animation in radians. */
     private _rotationLoader: number = 0;
     
@@ -69,8 +59,6 @@ export class Image extends Shape {
         if (!props.width || !props.height) this._dimensionDefined = false;
 
         this._image = new globalThis.Image();
-        this._loadingAlpha = this._minAlpha;
-
         this._setup();
     }
 
@@ -101,41 +89,26 @@ export class Image extends Shape {
     }
 
     /**
-     * Updates the loading alpha animation.
-     */
-    private _updateLoadingAlpha(): void {
-        if (!this._isLoading) return;
-
-        if (this._loadingAlpha >= this._maxAlpha && this._alphaDirection === "up") {
-            this._alphaDirection = "down";
-        } else if (this._loadingAlpha <= this._minAlpha && this._alphaDirection === "down") {
-            this._alphaDirection = "up";
-        }
-
-        const targetAlpha = this._alphaDirection === "up" ? this._maxAlpha : this._minAlpha;
-        this._loadingAlpha = Render.lerp(this._loadingAlpha, targetAlpha, this._alphaSpeed);
-        this._rotationLoader += 0.1;
-    }
-
-    /**
      * Draws the loading placeholder with pulsating effect.
      */
     private _drawLoadingPlaceholder(): void {
+        this._rotationLoader += 0.1;
         this._ctx.save();
         
         const offset = this._render.getOffset();
 
+        const alpha = 0.5 + Math.sin(Date.now() * 0.005) * 0.2;
         this._ctx.translate(this.position.x - offset.x, this.position.y - offset.y);
         this._ctx.rotate(this.rotation);
         
-        this._ctx.fillStyle = `rgba(200, 200, 200, ${this._loadingAlpha})`;
+        this._ctx.fillStyle = `rgba(200, 200, 200, ${alpha})`;
         this._ctx.fillRect(0, 0, this.width, this.height);
         
-        this._ctx.strokeStyle = `rgba(150, 150, 150, ${this._loadingAlpha * 0.5})`;
+        this._ctx.strokeStyle = `rgba(150, 150, 150, ${alpha * 0.5})`;
         this._ctx.lineWidth = 2;
         this._ctx.strokeRect(0, 0, this.width, this.height);
         
-        this._drawLoadingIcon();
+        this._drawLoadingIcon(alpha);
         
         this._ctx.restore();
     }
@@ -143,7 +116,7 @@ export class Image extends Shape {
     /**
      * Draws a simple loading icon in the center of the placeholder.
      */
-    private _drawLoadingIcon(): void {
+    private _drawLoadingIcon(alpha: number): void {
         const centerX = this.width / 2;
         const centerY = this.height / 2;
         const radius = Math.min(this.width, this.height) * 0.1;
@@ -151,7 +124,7 @@ export class Image extends Shape {
         this._ctx.save();
         this._ctx.translate(centerX, centerY);
         this._ctx.rotate(this._rotationLoader);
-        this._ctx.strokeStyle = `rgba(100, 100, 100, ${this._loadingAlpha})`;
+        this._ctx.strokeStyle = `rgba(100, 100, 100, ${alpha})`;
         this._ctx.lineWidth = 3;
         this._ctx.beginPath();
         this._ctx.arc(0, 0, radius, 0, Math.PI * 1.5);
@@ -323,27 +296,7 @@ export class Image extends Shape {
      * Updates the image's state and re-renders it on the canvas.
      */
     public update(): void {
-        this._updateLoadingAlpha();
-        
         this.draw();
-    }
-
-    /**
-     * Sets the loading animation speed.
-     * @param speed - Speed value between 0.01 (slow) and 0.2 (fast)
-     */
-    public setLoadingSpeed(speed: number): void {
-        this._alphaSpeed = Math.max(0.01, Math.min(0.2, speed));
-    }
-
-    /**
-     * Sets the alpha range for the loading animation.
-     * @param min - Minimum alpha value (0-1)
-     * @param max - Maximum alpha value (0-1)
-     */
-    public setLoadingAlphaRange(min: number, max: number): void {
-        this._minAlpha = Math.max(0, Math.min(1, min));
-        this._maxAlpha = Math.max(this._minAlpha, Math.min(1, max));
     }
 
     /**
