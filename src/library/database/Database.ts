@@ -15,12 +15,13 @@ interface WorkerResponse {
     success: boolean;
     data?: any;
     error?: string;
+    progress?: { p: number; state: boolean };
 }
 
 export class Database<TSchema extends Record<string, TableSchema> = {}> {
     private _db: IDBDatabase | null = null;
     private _worker: Worker | null = null;
-    private _workerPromises: Map<string, { resolve: (value: any) => void; reject: (error: any) => void }> = new Map();
+    private _workerPromises: Map<string, { resolve: (value: any) => void; reject: (error: any) => void; onProgress?: (progress: { p: number; state: boolean }) => void }> = new Map();
 
     public name: string;
     public version: number;
@@ -52,45 +53,87 @@ export class Database<TSchema extends Record<string, TableSchema> = {}> {
                 });
             }
 
-            async function bulkInsert(tableName, dataArray) {
+            async function bulkInsert(tableName, dataArray, messageId) {
                 if (!db) throw new Error('Database not opened in worker');
                 
-                const transaction = db.transaction([tableName], 'readwrite');
-                const store = transaction.objectStore(tableName);
+                const total = dataArray.length;
+                let completed = 0;
+                const batchSize = 50;
+                const results = [];
                 
-                const promises = dataArray.map(data => {
-                    return new Promise((resolve, reject) => {
-                        const request = store.put(data);
-                        request.onsuccess = () => resolve(request.result);
-                        request.onerror = () => reject(request.error);
+                for (let i = 0; i < dataArray.length; i += batchSize) {
+                    const batch = dataArray.slice(i, i + batchSize);
+                    
+                    const transaction = db.transaction([tableName], 'readwrite');
+                    const store = transaction.objectStore(tableName);
+                    
+                    const batchPromises = batch.map(data => {
+                        return new Promise((resolve, reject) => {
+                            const request = store.put(data);
+                            request.onsuccess = () => {
+                                completed++;
+                                resolve(request.result);
+                            };
+                            request.onerror = () => reject(request.error);
+                        });
                     });
+                    
+                    const batchResults = await Promise.all(batchPromises);
+                    results.push(...batchResults);
+                    
+                    const progress = completed / total;
+                    self.postMessage({
+                        id: messageId,
+                        success: true,
+                        progress: { p: progress, state: true }
+                    });
+                    
+                    if (i + batchSize < dataArray.length) {
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                    }
+                }
+                
+                self.postMessage({
+                    id: messageId,
+                    success: true,
+                    progress: { p: 1, state: false }
                 });
                 
-                return Promise.all(promises);
+                return results;
             }
 
             async function bulkUpdate(tableName, updates) {
                 if (!db) throw new Error('Database not opened in worker');
                 
-                const transaction = db.transaction([tableName], 'readwrite');
-                const store = transaction.objectStore(tableName);
                 const results = [];
+                const batchSize = 50;
                 
-                for (const update of updates) {
-                    const getRequest = await new Promise((resolve, reject) => {
-                        const req = store.get(update.key);
-                        req.onsuccess = () => resolve(req.result);
-                        req.onerror = () => reject(req.error);
-                    });
+                for (let i = 0; i < updates.length; i += batchSize) {
+                    const batch = updates.slice(i, i + batchSize);
                     
-                    if (getRequest) {
-                        const updatedData = { ...getRequest, ...update.data };
-                        const putResult = await new Promise((resolve, reject) => {
-                            const req = store.put(updatedData);
+                    const transaction = db.transaction([tableName], 'readwrite');
+                    const store = transaction.objectStore(tableName);
+                    
+                    for (const update of batch) {
+                        const getRequest = await new Promise((resolve, reject) => {
+                            const req = store.get(update.key);
                             req.onsuccess = () => resolve(req.result);
                             req.onerror = () => reject(req.error);
                         });
-                        results.push(putResult);
+                        
+                        if (getRequest) {
+                            const updatedData = { ...getRequest, ...update.data };
+                            const putResult = await new Promise((resolve, reject) => {
+                                const req = store.put(updatedData);
+                                req.onsuccess = () => resolve(req.result);
+                                req.onerror = () => reject(req.error);
+                            });
+                            results.push(putResult);
+                        }
+                    }
+                    
+                    if (i + batchSize < updates.length) {
+                        await new Promise(resolve => setTimeout(resolve, 10));
                     }
                 }
                 
@@ -100,18 +143,32 @@ export class Database<TSchema extends Record<string, TableSchema> = {}> {
             async function bulkDelete(tableName, keys) {
                 if (!db) throw new Error('Database not opened in worker');
                 
-                const transaction = db.transaction([tableName], 'readwrite');
-                const store = transaction.objectStore(tableName);
+                const batchSize = 50;
+                const results = [];
                 
-                const promises = keys.map(key => {
-                    return new Promise((resolve, reject) => {
-                        const request = store.delete(key);
-                        request.onsuccess = () => resolve(true);
-                        request.onerror = () => reject(request.error);
+                for (let i = 0; i < keys.length; i += batchSize) {
+                    const batch = keys.slice(i, i + batchSize);
+                    
+                    const transaction = db.transaction([tableName], 'readwrite');
+                    const store = transaction.objectStore(tableName);
+                    
+                    const promises = batch.map(key => {
+                        return new Promise((resolve, reject) => {
+                            const request = store.delete(key);
+                            request.onsuccess = () => resolve(true);
+                            request.onerror = () => reject(request.error);
+                        });
                     });
-                });
+                    
+                    const batchResults = await Promise.all(promises);
+                    results.push(...batchResults);
+                    
+                    if (i + batchSize < keys.length) {
+                        await new Promise(resolve => setTimeout(resolve, 10));
+                    }
+                }
                 
-                return Promise.all(promises);
+                return results;
             }
 
             async function getDatabaseSize() {
@@ -195,7 +252,7 @@ export class Database<TSchema extends Record<string, TableSchema> = {}> {
                             break;
                             
                         case 'BULK_INSERT':
-                            result = await bulkInsert(payload.tableName, payload.data);
+                            result = await bulkInsert(payload.tableName, payload.data, id);
                             break;
                             
                         case 'BULK_UPDATE':
@@ -242,12 +299,19 @@ export class Database<TSchema extends Record<string, TableSchema> = {}> {
             const promise = this._workerPromises.get(response.id);
             
             if (promise) {
-                this._workerPromises.delete(response.id);
+                if (response.progress && promise.onProgress) {
+                    promise.onProgress(response.progress);
+                    return;
+                }
                 
-                if (response.success) {
-                    promise.resolve(response.data);
-                } else {
-                    promise.reject(new Error(response.error));
+                if (response.data !== undefined || response.error !== undefined) {
+                    this._workerPromises.delete(response.id);
+                    
+                    if (response.success) {
+                        promise.resolve(response.data);
+                    } else {
+                        promise.reject(new Error(response.error));
+                    }
                 }
             }
         };
@@ -257,7 +321,7 @@ export class Database<TSchema extends Record<string, TableSchema> = {}> {
         };
     }
 
-    private async _sendToWorker(type: string, payload: any): Promise<any> {
+    private async _sendToWorker(type: string, payload: any, onProgress?: (progress: { p: number; state: boolean }) => void): Promise<any> {
         if (!this._worker) {
             throw new Error('Worker not initialized');
         }
@@ -265,7 +329,11 @@ export class Database<TSchema extends Record<string, TableSchema> = {}> {
         const id = Math.random().toString(36).substr(2, 9);
         
         return new Promise((resolve, reject) => {
-            this._workerPromises.set(id, { resolve, reject });
+            const promiseData: { resolve: (value: any) => void; reject: (error: any) => void; onProgress?: (progress: { p: number; state: boolean }) => void } = { resolve, reject };
+            if (onProgress) {
+                promiseData.onProgress = onProgress;
+            }
+            this._workerPromises.set(id, promiseData);
             
             this._worker!.postMessage({
                 id,
@@ -406,18 +474,23 @@ export class Database<TSchema extends Record<string, TableSchema> = {}> {
     public async bulkInsert<TName extends TableName<TSchema>>(
         tableName: TName,
         dataArray: TSchema[TName][],
-        useWorker: boolean = true
+        useWorker: boolean = true,
+        onProgress?: (progress: { p: number; state: boolean }) => void
     ): Promise<Array<TSchema[TName][keyof TSchema[TName] & string]>> {
+        if (onProgress) {
+            onProgress({ p: 0, state: true });
+        }
+        
         if (useWorker) {
             return this._sendToWorker('BULK_INSERT', {
                 tableName,
                 data: dataArray
-            });
+            }, onProgress);
         }
         
         const table = this.get(tableName);
         if (!table) throw new Error(`Table '${tableName}' not found`);
-        return table.putMany(dataArray);
+        return table.putMany(dataArray, false, 100, onProgress);
     }
 
     public async bulkUpdate<TName extends TableName<TSchema>>(

@@ -300,26 +300,21 @@ export class Image extends Shape {
     }
 
     /**
-     * Checks if the image is currently loading.
-     * @returns True if the image is still loading
-     */
-    public get isLoading(): boolean {
-        return this._isLoading;
-    }
-
-    /**
      * Creates a deep copy of this image.
      */
     public clone(): Image {
-        return this._render.creator.Image({
+        const cloned = new Image({
             ...this,
             position: this.position.clone(),
-        });
+        }, this._render);
+        this._render.manager.addChild(cloned);
+        return cloned;
     }
 
     /**
      * @internal
      * Returns the raw data of the image.
+     * @returns The raw data of the image.
      */
     public _rawData(): ImageRawData {
         return {

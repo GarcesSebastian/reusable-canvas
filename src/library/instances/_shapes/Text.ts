@@ -588,22 +588,21 @@ export class Text extends Shape {
             text: this.value,
             fontSize: this.fontSize,
             fontFamily: this.fontFamily,
+            color: this.color,
+            position: this.position.clone(),
+            rotation: this.rotation,
+            visible: this.visible,
+            textAlign: this.textAlign,
             fontWeight: this.fontWeight,
             fontStyle: this.fontStyle,
-            textAlign: this.textAlign,
-            color: this.color,
-            position: this.position,
-            zIndex: this.zIndex,
-            rotation: this.rotation,
-            dragging: this.dragging,
-            visible: this.visible,
+            padding: this.padding,
             backgroundColor: this.backgroundColor,
             borderWidth: this.borderWidth,
             borderColor: this.borderColor,
-            padding: this.padding,
-        }
-
-        return new Text(payload, this._render, this.id);
+        };
+        const cloned = new Text(payload, this._render);
+        this._render.manager.addChild(cloned);
+        return cloned;
     }
 
     /**

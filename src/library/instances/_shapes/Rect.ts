@@ -189,10 +189,12 @@ export class Rect extends Shape {
      * @returns A new `Rect` instance with the same properties.
      */
     public clone() : Rect {
-        return this._render.creator.Rect({
+        const cloned = new Rect({
             ...this,
             position: this.position.clone(),
-        });
+        }, this._render);
+        this._render.manager.addChild(cloned);
+        return cloned;
     }
 
     /**

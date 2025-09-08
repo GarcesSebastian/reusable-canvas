@@ -124,10 +124,12 @@ export class Circle extends Shape {
      * @returns A new `Circle` instance with the same properties.
      */
     public clone() : Circle {
-        return this._render.creator.Circle({
+        const cloned = new Circle({
             ...this,
             position: this.position.clone(),
-        });
+        }, this._render);
+        this._render.manager.addChild(cloned);
+        return cloned;
     }
 
     /**

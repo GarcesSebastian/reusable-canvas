@@ -52,8 +52,14 @@ export class Render extends RenderProvider {
 
     /** Database instance for data persistence. */
     private _database: Database | null = null;
-    /** Serialized shape data for auto-save. */
-    private _data: ShapeRawData[] = [];
+    /** Last serialized data string for comparison to avoid unnecessary saves. */
+    private _lastSerializedData: string = "";
+    /** Callback function for saving progress updates. */
+    public onSavingProgress: ((progress: { p: number; state: boolean }) => void) | null = null;
+    /** Callback function for loading progress updates. */
+    public onLoadProgress: ((progress: { p: number; state: boolean }) => void) | null = null;
+    /** Debounce timeout for configuration-only saves. */
+    private _configSaveTimeout: number | null = null;
 
     /** Current animation frame ID. */
     private _frameId: number | null = null
@@ -132,15 +138,7 @@ export class Render extends RenderProvider {
     /** Manager for renderer elements. */
     public manager: RenderManager;
 
-    /** Timeout para debounce del auto-save */
-    private _autoSaveTimeout: number | null = null;
-    /** Intervalo mínimo entre saves (en ms) */
-    private _autoSaveDelay: number = 500;
-    /** Flag para indicar si hay un save pendiente */
-    private _pendingSave: boolean = false;
-    /** Última data serializada para evitar saves innecesarios */
-    private _lastSerializedData: string | null = null;
-    /** Contador para logs de debug */
+    /** Counter for save operations */
     private _saveCounter: number = 0;
 
     /**
@@ -267,6 +265,9 @@ export class Render extends RenderProvider {
             this._globalPosition.x += (worldAfter.x - worldBefore.x) * this._zoom;
             this._globalPosition.y += (worldAfter.y - worldBefore.y) * this._zoom;
         }
+
+        this._offsetPan.x -= event.deltaX / this._zoom;
+        this._offsetPan.y -= event.deltaY / this._zoom;
     
         if (this._wheelTimeout) {
             clearTimeout(this._wheelTimeout);
@@ -281,7 +282,7 @@ export class Render extends RenderProvider {
      * @private
      */
     private _onMouseWheelEnd(): void {
-        this.autoSave(false, false);        
+        this.autoSave(false);        
     }
 
     /**
@@ -410,11 +411,11 @@ export class Render extends RenderProvider {
 
         if (this._isDragging && this._draggingShape) {
             this._draggingShape.emit("dragend", this._getArgs(this._draggingShape))
-            this.autoSave(true, false);
+            this.autoSave(true);
         }
 
         if (this._isPan) {
-            this.autoSave(false, false);
+            this.autoSave(false);
         }
 
         this._isDragging = false;
@@ -775,15 +776,9 @@ export class Render extends RenderProvider {
      * Método para forzar save inmediato (útil para casos específicos)
      */
     public forceSave(): void {
-        this.autoSave(true, true); // history=true, force=true
+        this.autoSave(true);
     }
 
-    /**
-     * Método para configurar el delay del auto-save
-     */
-    public setAutoSaveDelay(delay: number): void {
-        this._autoSaveDelay = Math.max(100, delay); // Mínimo 100ms
-    }
 
     /**
      * Undoes the last operation in history.
@@ -803,32 +798,52 @@ export class Render extends RenderProvider {
      * Automatically saves the current state of the canvas.
      * @param history - If true, adds the save to history; otherwise just saves without adding to history.
      */
-    public autoSave(history: boolean = true, force: boolean = false): void {
-        if (this._pendingSave && !force) {
-            return;
-        }
-
-        if (this._autoSaveTimeout) {
-            clearTimeout(this._autoSaveTimeout);
-            this._autoSaveTimeout = null;
-        }
-
-        if (force) {
+    public autoSave(history: boolean = true): void {
+        if (!history) {
+            this._debouncedConfigSave();
+        } else {
             this._executeSave(history);
-            return;
         }
-
-        this._pendingSave = true;
-        this._autoSaveTimeout = window.setTimeout(() => {
-            this._executeSave(history);
-            this._pendingSave = false;
-            this._autoSaveTimeout = null;
-        }, this._autoSaveDelay);
     }
 
     /**
-     * Executes the save process.
-     * @param history - If true, adds the save to history; otherwise just saves without adding to history.
+     * Debounced configuration save to prevent FPS drops during pan/zoom
+     * @private
+     */
+    private _debouncedConfigSave(): void {
+        if (this._configSaveTimeout) {
+            clearTimeout(this._configSaveTimeout);
+        }
+        
+        this._configSaveTimeout = window.setTimeout(() => {
+            this._executeConfigOnlySave();
+            this._configSaveTimeout = null;
+        }, 150);
+    }
+
+    /**
+     * Executes configuration-only save without progress callbacks for better FPS
+     * @private
+     */
+    private async _executeConfigOnlySave(): Promise<void> {
+        try {
+            if (!this.configuration.config.save) return;
+
+            if (this.configuration.config.save === "indexeddb") {
+                const configurationTable = this._database?.getTable("configurations" as never);
+                if (configurationTable) {
+                    await this._saveConfiguration(configurationTable);
+                }
+            } else if (this.configuration.config.save === "localstorage") {
+                localStorage.setItem("canvasConfiguration", JSON.stringify(this.getProperties()));
+            }
+        } catch (error) {
+            console.error('Error in config-only save:', error);
+        }
+    }
+
+    /**
+     * Executes the save operation.
      * @private
      */
     private async _executeSave(history: boolean): Promise<void> {
@@ -836,29 +851,28 @@ export class Render extends RenderProvider {
             const newData = await this._serializeAsync();
             const serializedString = JSON.stringify(newData);
 
-            if (this._lastSerializedData === serializedString) {
-                return;
-            }
+            const dataHasChanged = serializedString !== this._lastSerializedData;
 
-            this._lastSerializedData = serializedString;
-            this._data = newData;
             this._saveCounter++;
 
             if (history) {
-                this.history.save(this._data);
+                this.history.save(newData);
             }
 
             if (!this.configuration.config.save) return;
 
             if (this.configuration.config.save === "localstorage") {
-                await this._saveToLocalStorage(serializedString);
+                await this._saveToLocalStorage(serializedString, dataHasChanged);
             } else if (this.configuration.config.save === "indexeddb") {
-                await this._saveToIndexedDB(newData);
+                await this._saveToIndexedDB(newData, dataHasChanged);
+            }
+
+            if (dataHasChanged) {
+                this._lastSerializedData = serializedString;
             }
 
         } catch (error) {
-            console.error('Error in autoSave:', error);
-            this._pendingSave = false;
+            console.error('Error in _executeSave:', error);
         }
     }
 
@@ -884,7 +898,7 @@ export class Render extends RenderProvider {
      * Save optimized for localStorage
      * @private
      */
-    private async _saveToLocalStorage(serializedString: string): Promise<void> {
+    private async _saveToLocalStorage(serializedString: string, dataHasChanged: boolean): Promise<void> {
         const sizeKB = serializedString.length / 1024;
         
         if (this._saveCounter % 10 === 0) {
@@ -894,7 +908,9 @@ export class Render extends RenderProvider {
         await new Promise<void>((resolve) => {
             setTimeout(() => {
                 try {
-                    localStorage.setItem("canvasData", serializedString);
+                    if (dataHasChanged) {
+                        localStorage.setItem("canvasData", serializedString);
+                    }
                     localStorage.setItem("canvasConfiguration", JSON.stringify(this.getProperties()));
                     resolve();
                 } catch (error) {
@@ -909,7 +925,7 @@ export class Render extends RenderProvider {
      * Save optimized for IndexedDB using web workers
      * @private
      */
-    private async _saveToIndexedDB(newData: ShapeRawData[]): Promise<void> {
+    private async _saveToIndexedDB(newData: ShapeRawData[], dataHasChanged: boolean): Promise<void> {
         try {
             const table = this._database?.getTable("nodes" as never);
             const configurationTable = this._database?.getTable("configurations" as never);
@@ -919,13 +935,39 @@ export class Render extends RenderProvider {
                 return;
             }
 
-            await Promise.all([
-                table.putMany(newData as never, true, 1000),
-                this._saveConfiguration(configurationTable)
-            ]);
+            const progressCallback = this.onSavingProgress;
+            
+            if (progressCallback) {
+                progressCallback({ p: 0, state: true });
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+
+            if (dataHasChanged) {
+                await table.putMany(newData as never, true, 50, progressCallback ? (progress) => {
+                    progressCallback({ p: progress.p * 0.9, state: true });
+                } : undefined);
+
+                if (progressCallback) {
+                    progressCallback({ p: 0.95, state: true });
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+            } else if (progressCallback) {
+                progressCallback({ p: 0.95, state: true });
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            
+            await this._saveConfiguration(configurationTable);
+            
+            if (progressCallback) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                progressCallback({ p: 1, state: false });
+            }
 
         } catch (error) {
             console.error('Error saving to IndexedDB:', error);
+            if (this.onSavingProgress) {
+                this.onSavingProgress({ p: 0, state: false });
+            }
         }
     }
 
@@ -936,13 +978,8 @@ export class Render extends RenderProvider {
     private async _saveConfiguration(configurationTable: any): Promise<void> {
         try {
             const configData = { id: "data", ...this.getProperties() };
-            const hasData = await configurationTable.get("data" as never);
             
-            if (hasData) {
-                await configurationTable.update("data" as never, configData as never);
-            } else {
-                await configurationTable.add(configData as never);
-            }
+            await configurationTable.put(configData as never);
         } catch (error) {
             console.error('Error saving configuration:', error);
         }
@@ -954,8 +991,31 @@ export class Render extends RenderProvider {
      */
     public async load(defaultData?: ShapeRawData[]): Promise<void> {
         if (defaultData) {
+            if (this.onLoadProgress) {
+                this.onLoadProgress({ p: 0, state: true });
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+
             this.emit("load", { data: defaultData });
+            
+            if (this.onLoadProgress) {
+                this.onLoadProgress({ p: 0.5, state: true });
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+
             this.deserialize(defaultData);
+            
+            if (this.onLoadProgress) {
+                this.onLoadProgress({ p: 0.9, state: true });
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+
+            this._lastSerializedData = JSON.stringify(defaultData);
+            
+            if (this.onLoadProgress) {
+                this.onLoadProgress({ p: 1, state: false });
+            }
+            
             return;
         }
 
@@ -968,19 +1028,50 @@ export class Render extends RenderProvider {
         let data: ShapeRawData[] | null = null;
     
         try {
+            if (this.onLoadProgress) {
+                this.onLoadProgress({ p: 0, state: true });
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+
             if (this.configuration.config.save === "localstorage") {
+                if (this.onLoadProgress) {
+                    this.onLoadProgress({ p: 0.2, state: true });
+                }
+
                 const localData = localStorage.getItem("canvasData");
                 if (localData) {
                     data = JSON.parse(localData);
+                }
+
+                if (this.onLoadProgress) {
+                    this.onLoadProgress({ p: 0.5, state: true });
                 }
 
                 const localConfiguration = localStorage.getItem("canvasConfiguration");
                 if (localConfiguration) {
                     this.setProperties(JSON.parse(localConfiguration));
                 }
+
+                if (this.onLoadProgress) {
+                    this.onLoadProgress({ p: 0.7, state: true });
+                }
             } else if (this.configuration.config.save === "indexeddb" && this._database) {
+                if (this.onLoadProgress) {
+                    this.onLoadProgress({ p: 0.2, state: true });
+                }
+
                 const data0 = await this._database.get("nodes" as never)?.getAll();
+                
+                if (this.onLoadProgress) {
+                    this.onLoadProgress({ p: 0.5, state: true });
+                }
+
                 const data1 = await this._database.get("configurations" as never)?.getAll();
+                
+                if (this.onLoadProgress) {
+                    this.onLoadProgress({ p: 0.7, state: true });
+                }
+
                 if (data0) {
                     data = data0;
                 }
@@ -991,14 +1082,33 @@ export class Render extends RenderProvider {
             }
     
             if (data && Array.isArray(data)) {
+                if (this.onLoadProgress) {
+                    this.onLoadProgress({ p: 0.8, state: true });
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                }
+
                 this.emit("load", { data });
                 this.deserialize(data);
                 this.history.save(data);
+                
+                if (this.onLoadProgress) {
+                    this.onLoadProgress({ p: 0.95, state: true });
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                }
+
+                this._lastSerializedData = JSON.stringify(data);
+            }
+
+            if (this.onLoadProgress) {
+                this.onLoadProgress({ p: 1, state: false });
             }
 
             this.database.getDatabaseSizeMB(true).then((size) => console.log(`Tamaño de la base de datos: ${size.toFixed(2)} MB`));
         } catch (error) {
             console.error("Error loading canvas data:", error);
+            if (this.onLoadProgress) {
+                this.onLoadProgress({ p: 0, state: false });
+            }
         }
     }
     
@@ -1108,27 +1218,25 @@ export class Render extends RenderProvider {
      * Cleans up all resources and removes event listeners.
      * Should be called before removing the renderer instance.
      */
-    public destroy() : void {
-        if (this._autoSaveTimeout) {
-            clearTimeout(this._autoSaveTimeout);
-            this._autoSaveTimeout = null;
-        }
-        if (this._pendingSave) {
-            this.forceSave();
+    public cleanup(): void {
+        if (this._frameId !== null) {
+            cancelAnimationFrame(this._frameId);
+            this._frameId = null;
         }
 
-        this.stop();
+        if (this._configSaveTimeout) {
+            clearTimeout(this._configSaveTimeout);
+            this._configSaveTimeout = null;
+        }
+
+        this.canvas.removeEventListener("contextmenu", this._onContextmenuBound);
+        this.canvas.removeEventListener("click", this._onMouseClickedBound);
+        this.canvas.removeEventListener("mousedown", this._onMouseDownBound);
+        this.canvas.removeEventListener("mousemove", this._onMouseMovedBound);
+        this.canvas.removeEventListener("mouseup", this._onMouseUpBound);
+        this.canvas.removeEventListener("wheel", this._onMouseWheelBound);
+        document.removeEventListener("keydown", this._onKeyDownBound);
+        document.removeEventListener("keyup", this._onKeyUpBound);
         window.removeEventListener("resize", this._resizeBound);
-        window.removeEventListener("change", this._resizeBound);
-        window.removeEventListener("orientationchange", this._resizeBound);
-        window.removeEventListener("visibilitychange", this._resizeBound);
-        window.removeEventListener("contextmenu", this._onContextmenuBound);
-        window.removeEventListener("click", this._onMouseClickedBound);
-        window.removeEventListener("mousedown", this._onMouseDownBound);
-        window.removeEventListener("mousemove", this._onMouseMovedBound);
-        window.removeEventListener("mouseup", this._onMouseUpBound);
-        window.removeEventListener("keydown", this._onKeyDownBound);
-        window.removeEventListener("keyup", this._onKeyUpBound);
-        window.removeEventListener("wheel", this._onMouseWheelBound);
     }
 }

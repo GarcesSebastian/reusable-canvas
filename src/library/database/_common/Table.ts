@@ -103,14 +103,17 @@ export class Table<TData extends TableSchema = any> implements ITable {
     public async putMany(
         dataArray: TData[], 
         useWorker: boolean = true,
-        batchSize: number = 100
+        batchSize: number = 100,
+        onProgress?: (progress: { p: number; state: boolean }) => void
     ): Promise<Array<TData[keyof TData & string]>> {
         if (useWorker) {
-            return (this.indexDB as any).bulkInsert(this.name, dataArray, true);
+            return (this.indexDB as any).bulkInsert(this.name, dataArray, true, onProgress);
         }
         
         if (dataArray.length > batchSize) {
             const results: Array<TData[keyof TData & string]> = [];
+            const total = dataArray.length;
+            let processedCount = 0;
             
             for (let i = 0; i < dataArray.length; i += batchSize) {
                 const batch = dataArray.slice(i, i + batchSize);
@@ -122,12 +125,27 @@ export class Table<TData extends TableSchema = any> implements ITable {
                     let completed = 0;
                     let hasError = false;
                     
+                    transaction.onerror = () => {
+                        if (!hasError) {
+                            hasError = true;
+                            reject(new Error('Transaction failed'));
+                        }
+                    };
+                    
+                    transaction.onabort = () => {
+                        if (!hasError) {
+                            hasError = true;
+                            reject(new Error('Transaction aborted'));
+                        }
+                    };
+                    
                     batch.forEach((data, index) => {
                         const request = store.put(data);
                         
                         request.onsuccess = () => {
                             promises[index] = request.result as TData[keyof TData & string];
                             completed++;
+                            processedCount++;
                             
                             if (completed === batch.length && !hasError) {
                                 resolve(promises);
@@ -145,9 +163,18 @@ export class Table<TData extends TableSchema = any> implements ITable {
                 
                 results.push(...batchResults);
                 
-                if (i + batchSize < dataArray.length) {
-                    await new Promise(resolve => setTimeout(resolve, 1));
+                if (onProgress) {
+                    const progress = processedCount / total;
+                    onProgress({ p: progress, state: true });
                 }
+                
+                if (i + batchSize < dataArray.length) {
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                }
+            }
+            
+            if (onProgress) {
+                onProgress({ p: 1, state: false });
             }
             
             return results;
@@ -243,6 +270,20 @@ export class Table<TData extends TableSchema = any> implements ITable {
                     let completed = 0;
                     let hasError = false;
                     
+                    transaction.onerror = () => {
+                        if (!hasError) {
+                            hasError = true;
+                            reject(new Error('Transaction failed'));
+                        }
+                    };
+                    
+                    transaction.onabort = () => {
+                        if (!hasError) {
+                            hasError = true;
+                            reject(new Error('Transaction aborted'));
+                        }
+                    };
+                    
                     batch.forEach(key => {
                         const request = store.delete(key);
                         
@@ -263,7 +304,7 @@ export class Table<TData extends TableSchema = any> implements ITable {
                 });
                 
                 if (i + batchSize < keys.length) {
-                    await new Promise(resolve => setTimeout(resolve, 1));
+                    await new Promise(resolve => setTimeout(resolve, 10));
                 }
             }
             return;
