@@ -21,6 +21,7 @@ export interface Keys {
     copy: string,
     cut: string,
     paste: string,
+    duplicate: string,
     delete: string,
     selectAll: string,
     top: string,
@@ -29,7 +30,7 @@ export interface Keys {
     back: string,
 }
 
-export type AutoSaveMethods = "cookies" | "localstorage" | null
+export type AutoSaveMethods = "localstorage" | null
 
 /**
  * Configuration properties for the render system.
@@ -157,6 +158,11 @@ export class RenderConfiguration {
                     return;
                 }
 
+                if (key === "duplicate") {
+                    this.duplicateNodes()
+                    return;
+                }
+
                 if (key === "top") {
                     this.topNodes()
                     return;
@@ -204,8 +210,6 @@ export class RenderConfiguration {
                         this._render.creator.Image({
                             src: dataUrl,
                             position: new Vector(this._render.mousePosition().x, this._render.mousePosition().y),
-                            width: 100,
-                            height: 100,
                         });
                     };
                     reader.readAsDataURL(file);
@@ -222,8 +226,6 @@ export class RenderConfiguration {
                 this._render.creator.Image({
                     src: textData.trim(),
                     position: new Vector(this._render.mousePosition().x, this._render.mousePosition().y),
-                    width: 100,
-                    height: 100,
                 });
                 return;
             }
@@ -285,6 +287,30 @@ export class RenderConfiguration {
         const nodes = Array.from(this._render.transformer.childs.values());
         nodes.forEach(node => node.destroy());
         this._render.emit("delete", { data: nodes });
+        this._render.autoSave();
+    }
+
+    /**
+     * Duplicates the nodes of the currently selected shapes.
+     * @returns void
+     */
+    public duplicateNodes(): void {
+        const nodes = Array.from(this._render.transformer.childs.values());
+        nodes.forEach(node => {
+            const clone = node.clone();
+            let width = 0;
+            if (node instanceof Rect) {
+                width = node.width;
+            } else if (node instanceof Circle) {
+                width = node.radius * 2;
+            } else if (node instanceof Text) {
+                width = node.width;
+            } else if (node instanceof Image) {
+                width = node.width;
+            }
+            clone.position = new Vector(node.position.x + width, node.position.y);
+            this._render.manager.addChild(clone);
+        });
         this._render.autoSave();
     }
 
@@ -448,6 +474,7 @@ export class RenderConfiguration {
             copy: "ctrl+c",
             cut: "ctrl+x",
             paste: "ctrl+v",
+            duplicate: "ctrl+d",
             delete: "delete",
             selectAll: "ctrl+a",
             top: "ctrl+i",

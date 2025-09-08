@@ -15,8 +15,6 @@ import { Image } from "./instances/_shapes/Image";
 import { Selection } from "./instances/utils/Selection";
 import { Transformer } from "./instances/common/Transformer";
 
-import Cookies from "js-cookie"
-
 /**
  * Main rendering system class.
  * Manages the canvas, mouse events, zoom, panning, and drawn shapes.
@@ -740,9 +738,9 @@ export class Render extends RenderProvider {
         if (history) this.history.save(this._data);
 
         if (!this.configuration.config.save) return;
-        if (this.configuration.config.save === "cookies") {
-            Cookies.set("canvasData", JSON.stringify(newData));
-        } else if (this.configuration.config.save === "localstorage") {
+        if (this.configuration.config.save === "localstorage") {
+            const sizeKB = new Blob([JSON.stringify(newData)]).size / 1024;
+            console.log(`Tamaño del estado: ${sizeKB.toFixed(2)} KB`);
             localStorage.setItem("canvasData", JSON.stringify(newData));
         }
     }
@@ -767,12 +765,7 @@ export class Render extends RenderProvider {
         let data: ShapeRawData[] | null = null;
     
         try {
-            if (this.configuration.config.save === "cookies") {
-                const cookieData = Cookies.get("canvasData");
-                if (cookieData) {
-                    data = JSON.parse(cookieData);
-                }
-            } else if (this.configuration.config.save === "localstorage") {
+            if (this.configuration.config.save === "localstorage") {
                 const localData = localStorage.getItem("canvasData");
                 if (localData) {
                     data = JSON.parse(localData);

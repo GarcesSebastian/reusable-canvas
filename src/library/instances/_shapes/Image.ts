@@ -5,8 +5,8 @@ import { Vector } from "../common/Vector";
 
 export interface IImage extends IShape {
     src: string;
-    width: number;
-    height: number;
+    width?: number;
+    height?: number;
     borderWidth?: number;
     borderColor?: string;
     cornerRadius?: number;
@@ -31,8 +31,14 @@ export class Image extends Shape {
 
     /** Whether the image is currently loading. */
     private _isLoading: boolean = true;
+    /** Whether the dimensions of the image are defined. */
+    private _dimensionDefined: boolean = true;
     /** The HTML image element used for rendering. */
     private _image: HTMLImageElement;
+    /** Original width of the image in pixels. */
+    private _originalWidth: number | undefined;
+    /** Original height of the image in pixels. */
+    private _originalHeight: number | undefined;
     /** Whether the image has failed to load. */
     private _error: boolean = false;
 
@@ -54,11 +60,13 @@ export class Image extends Shape {
 
         this._ctx = render.ctx;
         this.src = props.src;
-        this.width = props.width;
-        this.height = props.height;
+        this.width = props.width ?? 100;
+        this.height = props.height ?? 100;
         this.borderWidth = props.borderWidth ?? 0;
         this.borderColor = props.borderColor ?? "black";
         this.cornerRadius = props.cornerRadius ?? 0;
+
+        if (!props.width || !props.height) this._dimensionDefined = false;
 
         this._image = new globalThis.Image();
         this._loadingAlpha = this._minAlpha;
@@ -71,8 +79,16 @@ export class Image extends Shape {
      * Sets up the image by loading it and setting up event listeners.
      */
     private _setup(): void {
-        this._image.src = this.src;
+        this._image.crossOrigin = "anonymous";
         this._image.onload = () => {
+            this._originalWidth = this._image.naturalWidth;
+            this._originalHeight = this._image.naturalHeight;
+
+            if (!this._dimensionDefined) {
+                this.width = this._originalWidth;
+                this.height = this._originalHeight;
+            }
+
             this._isLoading = false;
         };
         
@@ -80,6 +96,8 @@ export class Image extends Shape {
             console.error(`Failed to load image: ${this.src}`);
             this._error = true;
         };
+
+        this._image.src = this.src;
     }
 
     /**
@@ -106,6 +124,7 @@ export class Image extends Shape {
         this._ctx.save();
         
         const offset = this._render.getOffset();
+
         this._ctx.translate(this.position.x - offset.x, this.position.y - offset.y);
         this._ctx.rotate(this.rotation);
         
@@ -213,15 +232,15 @@ export class Image extends Shape {
      * @internal
      * Determines if a point (usually the mouse cursor) is inside the image.
      */
-    public _isClicked(): boolean {
+    public _isClicked() : boolean {
         const mouseVector = this._render.worldPosition();
         const current = this.position.sub(this._render.getOffset());
         
         if (this.rotation === 0) {
             return mouseVector.x >= current.x && 
-                    mouseVector.x <= current.x + this.width &&
-                    mouseVector.y >= current.y && 
-                    mouseVector.y <= current.y + this.height;
+                   mouseVector.x <= current.x + this.width &&
+                   mouseVector.y >= current.y && 
+                   mouseVector.y <= current.y + this.height;
         }
         
         const dx = mouseVector.x - current.x;
@@ -234,9 +253,9 @@ export class Image extends Shape {
         const localY = dx * sin + dy * cos;
         
         return localX >= 0 && 
-                localX <= this.width &&
-                localY >= 0 && 
-                localY <= this.height;
+               localX <= this.width &&
+               localY >= 0 && 
+               localY <= this.height;
     }
 
     /**
