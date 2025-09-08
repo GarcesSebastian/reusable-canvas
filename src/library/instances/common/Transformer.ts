@@ -81,7 +81,9 @@ export class Transformer extends TransformerProvider {
     private _originalData: Map<string, { position: Vector; width?: number; height?: number; radius?: number; fontSize?: number }> = new Map();
     /** Original transformer bounds before transformation. */
     private _originalBounds: { width: number; height: number; position: Vector } = { width: 0, height: 0, position: new Vector(0, 0) };
-    
+    /** Indicates if the transformer is currently hidden. */
+    private _isHidden: boolean = false;
+
     /**
      * Creates a new Transformer instance.
      * @param render - The main Render context for drawing operations.
@@ -125,7 +127,7 @@ export class Transformer extends TransformerProvider {
         this._nodesBoxTemplate.set("bottom-center", new Vector(0.5, 1));
         this._nodesBoxTemplate.set("bottom-right", new Vector(1, 1));
     }
-    
+
     /**
      * Sets up event listeners for mouse interactions.
      * Handles mousedown, mousemove, mouseup, and click events.
@@ -152,7 +154,7 @@ export class Transformer extends TransformerProvider {
             this._isMovingSelection = false;
             this._activeNode = activeNode;
             this._lastMousePos = this._render.worldPosition();
-            
+
             this._originalData.clear();
             this._childs.forEach(child => {
                 const data: any = { position: child.position.copy() };
@@ -171,7 +173,7 @@ export class Transformer extends TransformerProvider {
                 }
                 this._originalData.set(child.id, data);
             });
-            
+
             this._originalBounds = {
                 width: this._width,
                 height: this._height,
@@ -199,7 +201,7 @@ export class Transformer extends TransformerProvider {
     private _onMouseMove(): void {
         if (!this._render.configuration.config.transform) return;
         const currentMousePos = this._render.worldPosition();
-        
+
         if (this._isMovingSelection && !this._isDragging) {
             const delta = currentMousePos.sub(this._lastMousePos);
             this._childs.forEach(child => {
@@ -318,7 +320,7 @@ export class Transformer extends TransformerProvider {
                 return true;
             }
         }
-        
+
         return false;
     }
 
@@ -348,7 +350,7 @@ export class Transformer extends TransformerProvider {
         );
 
         const nodeClicked = this._isClickedAnyNode();
-        
+
         return isInBox && !nodeClicked;
     }
 
@@ -392,9 +394,9 @@ export class Transformer extends TransformerProvider {
         let minY = Infinity;
         let maxX = -Infinity;
         let maxY = -Infinity;
-        
+
         if (this._childs.size === 0) return;
-        
+
         this._childs.forEach((child: Shape) => {
             let sizeX = 0;
             let sizeY = 0;
@@ -458,7 +460,7 @@ export class Transformer extends TransformerProvider {
      * @private
      */
     private _updateBox(): void {
-        if (this._childs.size === 0) return;
+        if (this._childs.size === 0 || this._isHidden) return;
 
         const posX = this._position.x - this.padding.left;
         const posY = this._position.y - this.padding.top;
@@ -484,7 +486,7 @@ export class Transformer extends TransformerProvider {
      * @private
      */
     private _updateNodes(): void {
-        if (this._childs.size === 0) return;
+        if (this._childs.size === 0 || this._isHidden) return;
         const offset = this._render.getOffset();
 
         this._nodesBox.forEach((node: NodeBox) => {
@@ -492,9 +494,9 @@ export class Transformer extends TransformerProvider {
 
             this._render.ctx.beginPath()
             this._render.ctx.rect(
-                node.position.x - (node.size.x / this._render.zoom) / 2 - offset.x, 
-                node.position.y - (node.size.y / this._render.zoom) / 2 - offset.y, 
-                node.size.x / this._render.zoom, 
+                node.position.x - (node.size.x / this._render.zoom) / 2 - offset.x,
+                node.position.y - (node.size.y / this._render.zoom) / 2 - offset.y,
+                node.size.x / this._render.zoom,
                 node.size.y / this._render.zoom
             )
             this._render.ctx.fillStyle = this.nodeColor
@@ -564,6 +566,8 @@ export class Transformer extends TransformerProvider {
      * Should be called every frame when shapes are selected.
      */
     public update(): void {
+        if (this._childs.size === 0 || this._isHidden) return;
+
         this._calculateBox();
         this._calculateNodesBox();
         this._updateBox();
@@ -574,7 +578,7 @@ export class Transformer extends TransformerProvider {
      * Sets the configuration for the transformer.
      * @param DataTransformer - The configuration object.
      */
-    public setConfig (DataTransformer: ITransformer): void {
+    public setConfig(DataTransformer: ITransformer): void {
         this.padding = DataTransformer?.padding ?? this.padding;
         this.borderWidth = DataTransformer?.borderWidth ?? this.borderWidth;
         this.borderColor = DataTransformer?.borderColor ?? this.borderColor;
@@ -582,6 +586,14 @@ export class Transformer extends TransformerProvider {
         this.nodeSize = DataTransformer?.nodeSize ?? this.nodeSize;
         this.nodeBorderWidth = DataTransformer?.nodeBorderWidth ?? this.nodeBorderWidth;
         this.nodeBorderColor = DataTransformer?.nodeBorderColor ?? this.nodeBorderColor;
+    }
+
+    public hide(): void {
+        this._isHidden = true;
+    }
+
+    public show(): void {
+        this._isHidden = false;
     }
 
     /**

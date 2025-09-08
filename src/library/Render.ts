@@ -17,6 +17,7 @@ import { Transformer } from "./instances/common/Transformer";
 import { Database } from "./database/Database";
 import { ConfigurationSchema, NodeSchema } from "./types/Schemas";
 import { RenderProperties } from "./types/Render";
+import { Exporter } from "./instances/utils/Exporter";
 
 /**
  * Main rendering system class.
@@ -49,6 +50,8 @@ export class Render extends RenderProvider {
     public transformer: Transformer;
     /** Selection system for shapes. */
     public selection: Selection;
+    /** Export system for shapes. */
+    public exporter: Exporter;
 
     /** Database instance for data persistence. */
     private _database: Database | null = null;
@@ -158,6 +161,7 @@ export class Render extends RenderProvider {
         this.history = new History(this)
         this.transformer = new Transformer(this)
         this.selection = new Selection(this)
+        this.exporter = new Exporter(this)
 
         this.setup()
         this.start()
@@ -658,11 +662,26 @@ export class Render extends RenderProvider {
      * Sets the properties of the renderer.
      * @param properties - Object containing the properties to set.
      */
-    public setProperties(properties: RenderProperties): void {
-        if (!properties) return;
-        if (properties.zoom) this._zoom = properties.zoom;
-        if (properties.globalPosition) this._globalPosition = properties.globalPosition;
-        if (properties.offsetPan) this._offsetPan = properties.offsetPan;
+    public setProperties(props: Partial<RenderProperties>) {
+        Object.assign(this, props);
+    }
+
+    /**
+     * @internal
+     * Prepares the renderer for export by hiding the transformer and disallowing the FPS counter.
+     */
+    public preExport(): void {
+        this.transformer.hide();
+        this.disallowFps();
+    }
+
+    /**
+     * @internal
+     * Restores the renderer after export by showing the transformer and allowing the FPS counter.
+     */
+    public postExport(): void {
+        this.transformer.show();
+        this.allowFps();
     }
 
     public getProperties(): RenderProperties {

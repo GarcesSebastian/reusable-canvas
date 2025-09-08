@@ -964,6 +964,14 @@ export class SnapSmart {
     }
 
     /**
+     * Gets the target shape for snapping.
+     * @returns The target shape or null if no target is set.
+     */
+    public getTarget(): Shape | Transformer | null {
+        return this._target;
+    }
+
+    /**
      * Renders all active guide lines with enhanced styling for different types
      */
     public drawGuides(): void {
