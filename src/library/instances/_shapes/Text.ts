@@ -204,21 +204,21 @@ export class Text extends Shape {
         const worldPosition = this.position;
         
         const absolutePosition = this._render.toAbsoluteCoordinates(worldPosition)
-            .sub(this._render.getOffset().scale(this._render.scale));
+            .sub(this._render.getOffset().scale(this._render.zoom));
         
         const offsetX = this._getTextOffsetX();
         const ascent = (this._ascent + this.padding.top + this.padding.bottom);
 
-        const paddingLeft = this.padding.left * this._render.scale;
-        const paddingTop = this.padding.top * this._render.scale;
+        const paddingLeft = this.padding.left * this._render.zoom;
+        const paddingTop = this.padding.top * this._render.zoom;
         
         const rectX = offsetX - paddingLeft;
         const rectY = paddingTop;
         const rectW = this._width + this.padding.left + this.padding.right;
         const rectH = this._height + this.padding.top + this.padding.bottom;
 
-        const scaledRectW = rectW * this._render.scale;
-        const scaledRectH = rectH * this._render.scale;
+        const scaledRectW = rectW * this._render.zoom;
+        const scaledRectH = rectH * this._render.zoom;
         const scaledRectX = rectX;
         const scaledRectY = rectY;
 
@@ -230,20 +230,20 @@ export class Text extends Shape {
         this._textarea.value = this.value;
         this._textarea.style.position = "absolute";
         this._textarea.style.left = `${finalPosition.x}px`;
-        this._textarea.style.top = `${finalPosition.y - ascent * this._render.scale}px`;
+        this._textarea.style.top = `${finalPosition.y - ascent * this._render.zoom}px`;
         this._textarea.style.width = `${scaledRectW}px`;
         this._textarea.style.minHeight = `${scaledRectH}px`;
         this._textarea.style.zIndex = "1000";
-        this._textarea.style.border = `${this.borderWidth * this._render.scale}px solid ${this.borderColor}`;
+        this._textarea.style.border = `${this.borderWidth * this._render.zoom}px solid ${this.borderColor}`;
         this._textarea.style.outline = "none";
         this._textarea.style.resize = "none";
-        this._textarea.style.fontSize = `${this.fontSize * this._render.scale}px`;
+        this._textarea.style.fontSize = `${this.fontSize * this._render.zoom}px`;
         this._textarea.style.fontFamily = this.fontFamily;
         this._textarea.style.fontWeight = this.fontWeight;
         this._textarea.style.fontStyle = this.fontStyle;
         this._textarea.style.color = this.color;
         this._textarea.style.backgroundColor = this.backgroundColor;
-        this._textarea.style.padding = `0px ${(this.padding.right * this._render.scale) / 2}px 0px ${(this.padding.left * this._render.scale) / 2}px`;
+        this._textarea.style.padding = `0px ${(this.padding.right * this._render.zoom) / 2}px 0px ${(this.padding.left * this._render.zoom) / 2}px`;
         this._textarea.style.boxSizing = "border-box";
         this._textarea.style.overflow = "hidden";
         this._textarea.style.scrollbarWidth = "none";
@@ -266,9 +266,9 @@ export class Text extends Shape {
         const lines = this.value.split('\n');
         const lineCount = Math.max(1, lines.length);
 
-        const scaledFontSize = this.fontSize * 1.2 * this._render.scale;
-        const scaledPaddingTop = this.padding.top * this._render.scale;
-        const scaledPaddingBottom = this.padding.bottom * this._render.scale;
+        const scaledFontSize = this.fontSize * 1.2 * this._render.zoom;
+        const scaledPaddingTop = this.padding.top * this._render.zoom;
+        const scaledPaddingBottom = this.padding.bottom * this._render.zoom;
         
         if (lineCount === 1) {
             const singleLineHeight = scaledFontSize + scaledPaddingTop / 2 + scaledPaddingBottom / 2;

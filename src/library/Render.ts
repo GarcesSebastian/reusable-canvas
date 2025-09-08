@@ -126,8 +126,6 @@ export class Render extends RenderProvider {
     public _maxZIndex: number = 0
     /** Minimum zIndex value of all shapes. */
     public _minZIndex: number = 0
-    /** Global scale of the canvas. */
-    public scale: number = 1
 
     /** Creator for shapes and elements. */
     public creator: RenderCreator;
@@ -264,7 +262,6 @@ export class Render extends RenderProvider {
                 this._zoom /= zoomFactor;
             }
     
-            this.scale = this._zoom;
             const worldAfter = this.toWorldCoordinates(mouse);
     
             this._globalPosition.x += (worldAfter.x - worldBefore.x) * this._zoom;
@@ -665,6 +662,8 @@ export class Render extends RenderProvider {
         if (properties.zoom) this._zoom = properties.zoom;
         if (properties.globalPosition) this._globalPosition = properties.globalPosition;
         if (properties.offsetPan) this._offsetPan = properties.offsetPan;
+
+        console.log(this._zoom, this._globalPosition, this._offsetPan);
     }
 
     public getProperties(): RenderProperties {

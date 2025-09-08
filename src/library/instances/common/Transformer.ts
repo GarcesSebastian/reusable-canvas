@@ -471,7 +471,7 @@ export class Transformer extends TransformerProvider {
         this._render.ctx.beginPath()
         this._render.ctx.rect(posX - offset.x, posY - offset.y, width, height)
         this._render.ctx.strokeStyle = this.borderColor
-        this._render.ctx.lineWidth = this.borderWidth / this._render.scale
+        this._render.ctx.lineWidth = this.borderWidth / this._render.zoom
         this._render.ctx.stroke()
         this._render.ctx.closePath()
 
@@ -492,14 +492,14 @@ export class Transformer extends TransformerProvider {
 
             this._render.ctx.beginPath()
             this._render.ctx.rect(
-                node.position.x - (node.size.x / this._render.scale) / 2 - offset.x, 
-                node.position.y - (node.size.y / this._render.scale) / 2 - offset.y, 
-                node.size.x / this._render.scale, 
-                node.size.y / this._render.scale
+                node.position.x - (node.size.x / this._render.zoom) / 2 - offset.x, 
+                node.position.y - (node.size.y / this._render.zoom) / 2 - offset.y, 
+                node.size.x / this._render.zoom, 
+                node.size.y / this._render.zoom
             )
             this._render.ctx.fillStyle = this.nodeColor
             this._render.ctx.strokeStyle = this.nodeBorderColor
-            this._render.ctx.lineWidth = this.nodeBorderWidth / this._render.scale
+            this._render.ctx.lineWidth = this.nodeBorderWidth / this._render.zoom
             this._render.ctx.fill()
             this._render.ctx.stroke()
             this._render.ctx.closePath()
