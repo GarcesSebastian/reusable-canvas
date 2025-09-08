@@ -217,5 +217,12 @@ export abstract class Shape extends ShapeProvider {
         if (this.render.transformer && this.render.transformer.inTransformer(this)) {
             this.render.transformer.remove(this);
         }
+
+        if (this.render.database) {
+            const table = this.render.database.getTable("nodes" as never)
+            if (table) {
+                table.delete(this.id as never)
+            }
+        }
     }
 }

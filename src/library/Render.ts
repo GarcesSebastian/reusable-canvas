@@ -14,6 +14,9 @@ import { Text } from "./instances/_shapes/Text";
 import { Image } from "./instances/_shapes/Image";
 import { Selection } from "./instances/utils/Selection";
 import { Transformer } from "./instances/common/Transformer";
+import { Database } from "./database/Database";
+import { ConfigurationSchema, NodeSchema } from "./types/Schemas";
+import { RenderProperties } from "./types/Render";
 
 /**
  * Main rendering system class.
@@ -47,6 +50,8 @@ export class Render extends RenderProvider {
     /** Selection system for shapes. */
     public selection: Selection;
 
+    /** Database instance for data persistence. */
+    private _database: Database | null = null;
     /** Serialized shape data for auto-save. */
     private _data: ShapeRawData[] = [];
 
@@ -101,6 +106,8 @@ export class Render extends RenderProvider {
 
     /** Current zoom factor. */
     private _zoom: number = 1
+    /** Timeout for wheel events. */
+    private _wheelTimeout: number | null = null;
 
     /** Last recorded click time to detect double clicks. */
     private _lastTimeClick: number = performance.now();
@@ -229,36 +236,44 @@ export class Render extends RenderProvider {
      */
     private _onMouseWheel(event: WheelEvent): void {
         event.preventDefault();
+    
         if (!this.pointerInWorld(this.mousePosition())) {
             event.stopPropagation();
             return;
         }
-
+    
         if (this._isZooming && this.configuration.config.zoom) {
             const zoomFactor = 1.05;
             const mouse = this.mousePosition();
             const worldBefore = this.toWorldCoordinates(mouse);
-        
+    
             if (event.deltaY < 0) {
                 this._zoom *= zoomFactor;
             } else {
                 this._zoom /= zoomFactor;
             }
-        
-            this.scale = this._zoom
+    
+            this.scale = this._zoom;
             const worldAfter = this.toWorldCoordinates(mouse);
-        
+    
             this._globalPosition.x += (worldAfter.x - worldBefore.x) * this._zoom;
             this._globalPosition.y += (worldAfter.y - worldBefore.y) * this._zoom;
         }
-
-        const isTouchpad = Math.abs(event.deltaX) > 0 || 
-                          (Math.abs(event.deltaY) < 50 && Math.abs(event.deltaY) > 0);
-        
-        if (isTouchpad && this.configuration.config.pan) {
-            this._offsetPan.x -= event.deltaX;
-            this._offsetPan.y -= event.deltaY;
+    
+        if (this._wheelTimeout) {
+            clearTimeout(this._wheelTimeout);
         }
+        this._wheelTimeout = window.setTimeout(() => {
+            this._onMouseWheelEnd();
+        }, 500);
+    }
+
+    /**
+     * Handles the mouse wheel end event.
+     * @private
+     */
+    private _onMouseWheelEnd(): void {
+        this.autoSave(false);        
     }
 
     /**
@@ -388,6 +403,10 @@ export class Render extends RenderProvider {
         if (this._isDragging && this._draggingShape) {
             this._draggingShape.emit("dragend", this._getArgs(this._draggingShape))
             this.autoSave();
+        }
+
+        if (this._isPan) {
+            this.autoSave(false);
         }
 
         this._isDragging = false;
@@ -599,6 +618,18 @@ export class Render extends RenderProvider {
     public get childs(): Shape[] {
         return this._getChildrens();
     }
+
+    /**
+     * Gets the database instance associated with this render.
+     * @returns The database instance.
+     */
+    public get database(): Database {
+        if (!this._database) {
+            throw new Error("Database not initialized");
+        }
+
+        return this._database;
+    }
     
     /**
      * Allows the display of the FPS counter.
@@ -612,6 +643,25 @@ export class Render extends RenderProvider {
      */
     public disallowFps(): void {
         this.showFps = false;
+    }
+
+    /**
+     * Sets the properties of the renderer.
+     * @param properties - Object containing the properties to set.
+     */
+    public setProperties(properties: RenderProperties): void {
+        if (!properties) return;
+        if (properties.zoom) this._zoom = properties.zoom;
+        if (properties.globalPosition) this._globalPosition = properties.globalPosition;
+        if (properties.offsetPan) this._offsetPan = properties.offsetPan;
+    }
+
+    public getProperties(): RenderProperties {
+        return {
+            zoom: this._zoom,
+            globalPosition: this._globalPosition,
+            offsetPan: this._offsetPan
+        };
     }
 
     /**
@@ -713,6 +763,10 @@ export class Render extends RenderProvider {
         return this.currentCamera.offset.sub(this._offsetPan);
     }
 
+    public async getSizeDatabase(): Promise<number> {
+        return await this._database?.getDatabaseSizeMB() ?? 0;
+    }
+
     /**
      * Undoes the last operation in history.
      */
@@ -742,6 +796,36 @@ export class Render extends RenderProvider {
             const sizeKB = new Blob([JSON.stringify(newData)]).size / 1024;
             console.log(`Tamaño del estado: ${sizeKB.toFixed(2)} KB`);
             localStorage.setItem("canvasData", JSON.stringify(newData));
+            localStorage.setItem("canvasConfiguration", JSON.stringify(this.getProperties()));
+        } else if (this.configuration.config.save === "indexeddb") {
+            const table = this._database?.getTable("nodes" as never);
+            if (!table) return;
+
+            newData.forEach(async (data) => {
+                const hasData = await table.get(data.id as never);
+                if (hasData) {
+                    await table.update(data.id as never, data as never);
+                    return;
+                }
+
+                await table.add(data as never);
+            });
+
+            const handleConfiguration = async () => {
+                const configurationTable = this._database?.getTable("configurations" as never);
+                if (!configurationTable) return;
+
+                const hasData = await configurationTable.get("data" as never);
+                if (hasData) {
+                    await configurationTable.update("data" as never, { id: "data", ...this.getProperties() } as never);
+                    return;
+                }
+
+                await configurationTable.add({ id: "data", ...this.getProperties() } as never);
+            }
+
+            handleConfiguration();
+
         }
     }
 
@@ -749,7 +833,7 @@ export class Render extends RenderProvider {
      * Loads the canvas state from serialized data.
      * @param defaultData - Serialized shape data.
      */
-    public load(defaultData?: ShapeRawData[]): void {
+    public async load(defaultData?: ShapeRawData[]): Promise<void> {
         if (defaultData) {
             this.emit("load", { data: defaultData });
             this.deserialize(defaultData);
@@ -769,6 +853,21 @@ export class Render extends RenderProvider {
                 const localData = localStorage.getItem("canvasData");
                 if (localData) {
                     data = JSON.parse(localData);
+                }
+
+                const localConfiguration = localStorage.getItem("canvasConfiguration");
+                if (localConfiguration) {
+                    this.setProperties(JSON.parse(localConfiguration));
+                }
+            } else if (this.configuration.config.save === "indexeddb" && this._database) {
+                const data0 = await this._database.get("nodes" as never)?.getAll();
+                const data1 = await this._database.get("configurations" as never)?.getAll();
+                if (data0) {
+                    data = data0;
+                }
+
+                if (data1) {
+                    this.setProperties(data1[0] as never);
                 }
             }
     
@@ -814,9 +913,26 @@ export class Render extends RenderProvider {
      * Loads a new configuration for the renderer.
      * @param config - Configuration object.
      */
-    public loadConfiguration(config: RenderConfigurationProps): void {
+    public async loadConfiguration(config: RenderConfigurationProps): Promise<void> {
         this.configuration.load(config)
-        this.load()
+        
+        if (this.configuration.config.save === "indexeddb") {
+            this._database = new Database('myDatabase', 5);
+
+            this._database.createTable<"nodes", NodeSchema>({
+                name: "nodes",
+                primary: "id",
+            })
+
+            this._database.createTable<"configurations", ConfigurationSchema>({
+                name: "configurations",
+                primary: "id",
+            })
+
+            await this._database.init();
+        }
+
+        await this.load()
     }
 
     /**

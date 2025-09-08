@@ -30,7 +30,7 @@ export interface Keys {
     back: string,
 }
 
-export type AutoSaveMethods = "localstorage" | null
+export type AutoSaveMethods = "localstorage" | "indexeddb" | null
 
 /**
  * Configuration properties for the render system.

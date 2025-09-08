@@ -276,13 +276,15 @@ export class Transformer extends TransformerProvider {
      */
     private _onMouseUp(): void {
         if (!this._render.configuration.config.transform) return;
+        if (this._isDragging || this._isMovingSelection || this._activeNode) {
+            this._render.autoSave();
+        }
         this._isDragging = false;
         this._isMovingSelection = false;
         this._activeNode = null;
         this._originalData.clear();
         this.emit("moveend", {})
         this.emit("resizeend", {})
-        this._render.autoSave();
     }
 
     /**
