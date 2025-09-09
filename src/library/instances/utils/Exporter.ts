@@ -275,7 +275,7 @@ export class Exporter {
      * @param props - Export configuration including format, quality, name, and optional cropping.
      * @returns A promise that resolves when the download is initiated.
      */
-    public async download(props: ExportProps): Promise<void> {
+    public async download(props: ExportProps & { scale?: number; dpi?: number; jpegQuality?: number }) {
         const blob = await this.export(props);
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -378,22 +378,19 @@ export class Exporter {
      * @param props - Export configuration including format, quality, name, and optional cropping.
      * @returns A promise that resolves to a blob containing the exported canvas data.
      */
-    public async export(props: ExportProps): Promise<Blob> {
-        const { format, quality, cutStart, cutEnd } = props;
+    public async export(props: ExportProps & { scale?: number; jpegQuality?: number }): Promise<Blob> {
+        const { format, quality, cutStart, cutEnd, scale = 1, jpegQuality = 0.95 } = props;
 
         const target = this._render.snapSmart.getTarget();
         this._render.preExport();
         this._render.snapSmart.unbind();
-
         this._render.selection._isSelecting = false;
         this._render.selection._startPosition = Vector.zero;
         this._render.selection._endPosition = Vector.zero;
         this._render.selection._width = 0;
         this._render.selection._height = 0;
-
         this.hideExportCut();
         this._render._render();
-
         await new Promise(resolve => requestAnimationFrame(resolve));
 
         try {
@@ -401,56 +398,52 @@ export class Exporter {
                 return this._exportToJson();
             }
 
-            const blob = await new Promise<Blob | null>((resolve) => {
-                const originalCanvas = this._render.canvas;
-                const exportCanvas = document.createElement("canvas");
+            const originalCanvas = this._render.canvas;
+            let cropX = 0, cropY = 0, cropWidth = originalCanvas.width, cropHeight = originalCanvas.height;
+            if (cutStart && cutEnd) {
+                cropX = Math.min(cutStart.x, cutEnd.x);
+                cropY = Math.min(cutStart.y, cutEnd.y);
+                cropWidth = Math.abs(cutEnd.x - cutStart.x);
+                cropHeight = Math.abs(cutEnd.y - cutStart.y);
+            }
 
-                let cropX = 0, cropY = 0, cropWidth = originalCanvas.width, cropHeight = originalCanvas.height;
-                if (cutStart && cutEnd) {
-                    cropX = Math.min(cutStart.x, cutEnd.x);
-                    cropY = Math.min(cutStart.y, cutEnd.y);
-                    cropWidth = Math.abs(cutEnd.x - cutStart.x);
-                    cropHeight = Math.abs(cutEnd.y - cutStart.y);
-                }
+            const ratio = window.devicePixelRatio || 1;
+            const qualityScale = this._getScaleFactor(quality ?? "high");
+            const finalScale = scale * qualityScale * ratio;
 
-                const scaleFactor = this._getScaleFactor(quality ?? "high");
+            const exportCanvas = document.createElement("canvas");
+            exportCanvas.width = Math.round(cropWidth * finalScale);
+            exportCanvas.height = Math.round(cropHeight * finalScale);
+            const ctx = exportCanvas.getContext("2d")!;
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
+            ctx.setTransform(finalScale, 0, 0, finalScale, 0, 0);
 
-                exportCanvas.width = cropWidth * scaleFactor;
-                exportCanvas.height = cropHeight * scaleFactor;
+            if (format === "jpeg" || format === "webp") {
+                ctx.fillStyle = "white";
+                ctx.fillRect(0, 0, cropWidth, cropHeight);
+            }
 
-                const ctx = exportCanvas.getContext("2d")!;
-                ctx.imageSmoothingEnabled = true;
-                ctx.imageSmoothingQuality = "high";
+            ctx.drawImage(
+                originalCanvas,
+                cropX, cropY, cropWidth, cropHeight,
+                0, 0, cropWidth, cropHeight
+            );
 
-                ctx.scale(scaleFactor, scaleFactor);
-
-                if (format === "jpeg" || format === "webp") {
-                    ctx.fillStyle = "white";
-                    ctx.fillRect(0, 0, cropWidth, cropHeight);
-                }
-                
-                ctx.drawImage(
-                    originalCanvas,
-                    cropX, cropY, cropWidth, cropHeight,
-                    0, 0, cropWidth, cropHeight
-                );
-
+            const mime = this._getFormat(format);
+            const qualityParam = format === "jpeg" || format === "webp" ? jpegQuality : undefined;
+            const blob: Blob | null = await new Promise(resolve =>
                 exportCanvas.toBlob(
                     resolve,
-                    this._getFormat(format),
-                    1.0
-                );
-            });
-
-            if (blob) {
-                return blob;
-            } else {
-                throw new Error("Failed to export canvas");
-            }
+                    mime,
+                    qualityParam
+                )
+            );
+            if (!blob) throw new Error("Failed to export canvas");
+            return blob;
         } finally {
             this._render.postExport();
             this.showExportCut();
-
             if (target) {
                 this._render.snapSmart.bind(target);
             }
