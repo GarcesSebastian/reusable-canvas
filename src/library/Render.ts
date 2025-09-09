@@ -268,10 +268,10 @@ export class Render extends RenderProvider {
     
             this._globalPosition.x += (worldAfter.x - worldBefore.x) * this._zoom;
             this._globalPosition.y += (worldAfter.y - worldBefore.y) * this._zoom;
+        } else {
+            this._offsetPan.x -= event.deltaX / this._zoom;
+            this._offsetPan.y -= event.deltaY / this._zoom;
         }
-
-        this._offsetPan.x -= event.deltaX / this._zoom;
-        this._offsetPan.y -= event.deltaY / this._zoom;
     
         if (this._wheelTimeout) {
             clearTimeout(this._wheelTimeout);
@@ -296,7 +296,6 @@ export class Render extends RenderProvider {
      * @private
      */
     private _onMouseDown(event: MouseEvent): void {
-        if (this.exporter.isCutting() || this.exporter.isResizing()) return;
         const clickedSelectedShape = this._getChildrens().find((child: Shape) => child._isClicked());
 
         if (event.button == 1 && this.configuration.config.pan) {
@@ -305,6 +304,8 @@ export class Render extends RenderProvider {
             return;
         }
         
+        if (this.exporter.isCutting() || this.exporter.isResizing()) return;
+
         if (!clickedSelectedShape && this.configuration.config.selection) {
             this.emit("mousedown", this._getArgs(this))
             if (this.transformer.isClickedTransformer()) return;

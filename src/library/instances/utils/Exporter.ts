@@ -61,6 +61,8 @@ export class Exporter {
     private _cutEnd: Vector | null = null;
     /** Whether the cut area is currently being drawn. */
     private _isCutting: boolean = false;
+    /** Whether the export area is hidden. */
+    private _isHidden: boolean = false;
 
     /** Whether the resize area is currently being drawn. */
     private _isResizing: boolean = false;
@@ -223,6 +225,8 @@ export class Exporter {
      * @private
      */
     private _drawCut(): void {
+        if (this._isHidden) return;
+        
         this._render.ctx.save();
         this._render.ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
         this._render.ctx.beginPath();
@@ -320,6 +324,22 @@ export class Exporter {
     }
 
     /**
+     * Hides the export cut area.
+     * @returns void
+     */
+    public hideExportCut(): void {
+        this._isHidden = true;
+    }
+
+    /**
+     * Shows the export cut area.
+     * @returns void
+     */
+    public showExportCut(): void {
+        this._isHidden = false;
+    }
+
+    /**
      * Gets the dimensions of the export cut area.
      * @returns An object containing the start and end positions of the cut area, or null if no cut is active.
      */
@@ -342,6 +362,17 @@ export class Exporter {
     }
 
     /**
+     * Aborts the export cut process.
+     * @returns void
+     */
+    public abort(): void {
+        this._isCutting = false;
+        this._isResizing = false;
+        this._cutStart = null;
+        this._cutEnd = null;
+    }
+
+    /**
      * Exports the canvas as a blob in the specified format.
      * Supports high-quality scaling and optional cropping functionality.
      * @param props - Export configuration including format, quality, name, and optional cropping.
@@ -349,7 +380,7 @@ export class Exporter {
      */
     public async export(props: ExportProps): Promise<Blob> {
         const { format, quality, cutStart, cutEnd } = props;
-        
+
         const target = this._render.snapSmart.getTarget();
         this._render.preExport();
         this._render.snapSmart.unbind();
@@ -360,8 +391,9 @@ export class Exporter {
         this._render.selection._width = 0;
         this._render.selection._height = 0;
 
+        this.hideExportCut();
         this._render._render();
-        
+
         await new Promise(resolve => requestAnimationFrame(resolve));
 
         try {
@@ -371,8 +403,8 @@ export class Exporter {
 
             const blob = await new Promise<Blob | null>((resolve) => {
                 const originalCanvas = this._render.canvas;
-                const exportCanvas = document.createElement('canvas');
-                
+                const exportCanvas = document.createElement("canvas");
+
                 let cropX = 0, cropY = 0, cropWidth = originalCanvas.width, cropHeight = originalCanvas.height;
                 if (cutStart && cutEnd) {
                     cropX = Math.min(cutStart.x, cutEnd.x);
@@ -380,27 +412,34 @@ export class Exporter {
                     cropWidth = Math.abs(cutEnd.x - cutStart.x);
                     cropHeight = Math.abs(cutEnd.y - cutStart.y);
                 }
-                
-                const scaleFactor = this._getScaleFactor(quality ?? "high");
-                exportCanvas.width = cropWidth * scaleFactor;  
-                exportCanvas.height = cropHeight * scaleFactor;
-                const ctx = exportCanvas.getContext('2d')!;
 
+                const scaleFactor = this._getScaleFactor(quality ?? "high");
+
+                exportCanvas.width = cropWidth * scaleFactor;
+                exportCanvas.height = cropHeight * scaleFactor;
+
+                const ctx = exportCanvas.getContext("2d")!;
                 ctx.imageSmoothingEnabled = true;
-                ctx.imageSmoothingQuality = 'high';
+                ctx.imageSmoothingQuality = "high";
 
                 ctx.scale(scaleFactor, scaleFactor);
 
-                ctx.fillStyle = 'black';
-                ctx.fillRect(0, 0, cropWidth, cropHeight);
-
+                if (format === "jpeg" || format === "webp") {
+                    ctx.fillStyle = "white";
+                    ctx.fillRect(0, 0, cropWidth, cropHeight);
+                }
+                
                 ctx.drawImage(
                     originalCanvas,
                     cropX, cropY, cropWidth, cropHeight,
                     0, 0, cropWidth, cropHeight
                 );
 
-                exportCanvas.toBlob(resolve, this._getFormat(format), 1.0);
+                exportCanvas.toBlob(
+                    resolve,
+                    this._getFormat(format),
+                    1.0
+                );
             });
 
             if (blob) {
@@ -410,10 +449,12 @@ export class Exporter {
             }
         } finally {
             this._render.postExport();
+            this.showExportCut();
 
             if (target) {
                 this._render.snapSmart.bind(target);
             }
         }
     }
+
 }
