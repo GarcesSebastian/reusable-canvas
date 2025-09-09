@@ -296,6 +296,7 @@ export class Render extends RenderProvider {
      * @private
      */
     private _onMouseDown(event: MouseEvent): void {
+        if (this.exporter.isCutting() || this.exporter.isResizing()) return;
         const clickedSelectedShape = this._getChildrens().find((child: Shape) => child._isClicked());
 
         if (event.button == 1 && this.configuration.config.pan) {
@@ -439,6 +440,7 @@ export class Render extends RenderProvider {
      * @private
      */
     private _onMouseClicked(): void {
+        if (this.exporter.isCutting() || this.exporter.isResizing()) return;
         let clicked: Shape | null = null
 
         this._getChildrens().forEach((child: Shape) => {
@@ -592,7 +594,8 @@ export class Render extends RenderProvider {
             this._updateFps()
             this._showFps()
         }
-        
+
+        this.exporter.update()
         this.ctx.restore()
 
         this.emit("update", {})
@@ -691,6 +694,10 @@ export class Render extends RenderProvider {
         this.allowFps();
     }
 
+    /**
+     * Gets the current properties of the renderer.
+     * @returns Object containing the current zoom, global position, and offset pan.
+     */
     public getProperties(): RenderProperties {
         return {
             zoom: this._zoom,

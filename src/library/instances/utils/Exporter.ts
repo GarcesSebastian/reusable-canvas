@@ -7,6 +7,8 @@ export type ExportFormat = "png" | "jpeg" | "webp" | "json";
 /** Quality levels for image exports. */
 export type ExportQuality = "low" | "medium" | "high";
 
+export type ExportSide = "top" | "bottom" | "left" | "right";
+
 /** Properties for configuring canvas export operations. */
 export interface ExportProps {
     /** The format to export the canvas as. */
@@ -53,6 +55,26 @@ export interface ExportProps {
 export class Exporter {
     /** The render instance used for canvas operations. */
     private _render: Render;
+    /** The start position of the cut area. */
+    private _cutStart: Vector | null = null;
+    /** The end position of the cut area. */
+    private _cutEnd: Vector | null = null;
+    /** Whether the cut area is currently being drawn. */
+    private _isCutting: boolean = false;
+
+    /** Whether the resize area is currently being drawn. */
+    private _isResizing: boolean = false;
+    /** The side of the resize area. */
+    private _resizeSide: ExportSide | null = null;
+    /** The minimum distance for the resize area. */
+    private _minDistance: number = 25;
+
+    /** The bound resize start event handler. */
+    private _onBoundResizeStart: () => void;
+    /** The bound resize event handler. */
+    private _onBoundResize: () => void;
+    /** The bound resize end event handler. */
+    private _onBoundResizeEnd: () => void;
 
     /**
      * Creates a new Exporter instance.
@@ -60,6 +82,118 @@ export class Exporter {
      */
     constructor(render: Render) {
         this._render = render;
+
+        this._onBoundResizeStart = this._onResizeStart.bind(this);
+        this._onBoundResize = this._onResize.bind(this);
+        this._onBoundResizeEnd = this._onResizeEnd.bind(this);
+        
+        this._setup();
+    }
+
+    /**
+     * Sets up the exporter by initializing all necessary components.
+     * @private
+     */
+    private _setup(): void {
+        this._events();
+    }
+
+    /**
+     * Sets up the events for the exporter.
+     * @private
+     */
+    private _events(): void {
+        window.addEventListener("mousedown", this._onBoundResizeStart);
+        window.addEventListener("mousemove", this._onBoundResize);
+        window.addEventListener("mouseup", this._onBoundResizeEnd);
+    }
+
+    /**
+     * Handles the resize start event.
+     * @private
+     */
+    private _onResizeStart(): void {
+        this._resizeSide = this._getSideClicked();
+        this._isResizing = false;
+        
+        if (!this._resizeSide) return;
+        this._isResizing = true;
+    }
+
+    /**
+     * Handles the resize event.
+     * @private
+     */
+    private _onResize(): void {
+        const hoveredSide = this._getSideClicked();
+        
+        if (hoveredSide) {
+            this._setCursor(hoveredSide);
+        } else {
+            this._setCursor(null);
+        }
+
+        if (!this._isResizing || !this._resizeSide) return;
+        const mouse = this._render.mousePosition();
+
+        if (this._resizeSide === "left") {
+            this._cutStart!.x = mouse.x;
+        }
+
+        if (this._resizeSide === "right") {
+            this._cutEnd!.x = mouse.x;
+        }
+
+        if (this._resizeSide === "top") {
+            this._cutStart!.y = mouse.y;
+        }
+
+        if (this._resizeSide === "bottom") {
+            this._cutEnd!.y = mouse.y;
+        }
+    }
+
+    /**
+     * Handles the resize end event.
+     * @private
+     */
+    private _onResizeEnd(): void {
+        this._isResizing = false;
+        this._resizeSide = null;
+    }
+
+    private _getSideClicked(): ExportSide | null {
+        const mouse = this._render.mousePosition();
+        if (this._cutStart && mouse.x < this._cutStart.x + this._minDistance && mouse.x > this._cutStart.x - this._minDistance) return "left";
+        if (this._cutStart && mouse.y < this._cutStart.y + this._minDistance && mouse.y > this._cutStart.y - this._minDistance) return "top";
+        if (this._cutEnd && mouse.x > this._cutEnd.x - this._minDistance && mouse.x < this._cutEnd.x + this._minDistance) return "right";
+        if (this._cutEnd && mouse.y > this._cutEnd.y - this._minDistance && mouse.y < this._cutEnd.y + this._minDistance) return "bottom";
+        return null;
+    }
+
+    /**
+     * Sets the cursor style based on the resize side being hovered.
+     * @param side - The side being hovered or null to reset cursor.
+     * @private
+     */
+    private _setCursor(side: ExportSide | null): void {
+        const canvas = this._render.canvas;
+        
+        if (!side) {
+            canvas.style.cursor = "default";
+            return;
+        }
+
+        switch (side) {
+            case "left":
+            case "right":
+                canvas.style.cursor = "ew-resize";
+                break;
+            case "top":
+            case "bottom":
+                canvas.style.cursor = "ns-resize";
+                break;
+        }
     }
 
     /**
@@ -75,8 +209,23 @@ export class Exporter {
             case "medium":
                 return 2.5;
             case "high":
-                return 4.0; // 4x resolution for ultra-high quality
+                return 4.0;
         }
+    }
+
+    /**
+     * Draws the cut area on the canvas.
+     * @private
+     */
+    private _drawCut(): void {
+        this._render.ctx.save();
+        this._render.ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+        this._render.ctx.beginPath();
+        this._render.ctx.rect(0, 0, this._render.canvas.width, this._render.canvas.height);
+        this._render.ctx.rect(this._cutStart!.x, this._cutStart!.y, this._cutEnd!.x - this._cutStart!.x, this._cutEnd!.y - this._cutStart!.y);
+        this._render.ctx.fill("evenodd");
+        this._render.ctx.closePath();
+        this._render.ctx.restore();
     }
 
     /**
@@ -121,6 +270,44 @@ export class Exporter {
         a.download = `${props.name}.${props.format}`;
         a.click();
         URL.revokeObjectURL(url);
+    }
+
+    public isCutting(): boolean {
+        return this._isCutting;
+    }
+
+    public isResizing(): boolean {
+        return this._isResizing;
+    }
+
+    /**
+     * Starts the export cut process.
+     * @returns void
+     */
+    public startExportCut(): void {
+        const distance = 100;
+        this._isCutting = true;
+        this._cutStart = new Vector(distance, distance);
+        this._cutEnd = new Vector(this._render.canvas.width - distance, this._render.canvas.height - distance);
+    }
+
+    /**
+     * Ends the export cut process.
+     * @returns void
+     */
+    public endExportCut(): void {
+        this._isCutting = false;
+        this._cutStart = null;
+        this._cutEnd = null;
+    }
+
+    /**
+     * Updates the export cut process.
+     * @returns void
+     */
+    public update(): void {
+        if (!this._isCutting) return;
+        this._drawCut();
     }
 
     /**
