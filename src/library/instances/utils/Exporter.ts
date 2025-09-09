@@ -162,6 +162,11 @@ export class Exporter {
         this._resizeSide = null;
     }
 
+    /**
+     * Gets the side of the cut area that is being hovered.
+     * @returns The side of the cut area that is being hovered or null if no side is hovered.
+     * @private
+     */
     private _getSideClicked(): ExportSide | null {
         const mouse = this._render.mousePosition();
         if (this._cutStart && mouse.x < this._cutStart.x + this._minDistance && mouse.x > this._cutStart.x - this._minDistance) return "left";
@@ -223,6 +228,10 @@ export class Exporter {
         this._render.ctx.beginPath();
         this._render.ctx.rect(0, 0, this._render.canvas.width, this._render.canvas.height);
         this._render.ctx.rect(this._cutStart!.x, this._cutStart!.y, this._cutEnd!.x - this._cutStart!.x, this._cutEnd!.y - this._cutStart!.y);
+        this._render.ctx.strokeStyle = "rgba(255, 255, 255, 1)";
+        this._render.ctx.lineWidth = 2;
+        this._render.ctx.setLineDash([5, 5]);
+        this._render.ctx.stroke();
         this._render.ctx.fill("evenodd");
         this._render.ctx.closePath();
         this._render.ctx.restore();
@@ -272,10 +281,18 @@ export class Exporter {
         URL.revokeObjectURL(url);
     }
 
+    /**
+     * Checks if the export cut process is active.
+     * @returns True if the export cut process is active, false otherwise.
+     */
     public isCutting(): boolean {
         return this._isCutting;
     }
 
+    /**
+     * Checks if the export resize process is active.
+     * @returns True if the export resize process is active, false otherwise.
+     */
     public isResizing(): boolean {
         return this._isResizing;
     }
@@ -297,8 +314,22 @@ export class Exporter {
      */
     public endExportCut(): void {
         this._isCutting = false;
+        this._isResizing = false;
         this._cutStart = null;
         this._cutEnd = null;
+    }
+
+    /**
+     * Gets the dimensions of the export cut area.
+     * @returns An object containing the start and end positions of the cut area, or null if no cut is active.
+     */
+    public getDimension(): { start: Vector, end: Vector } | null {
+        if (!this._cutStart || !this._cutEnd) return null;
+
+        return {
+            start: this._cutStart,
+            end: this._cutEnd
+        }
     }
 
     /**
