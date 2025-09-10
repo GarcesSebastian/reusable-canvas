@@ -1,5 +1,19 @@
-import type { TransformerEventsMap, TransformerEventsType } from "../types/TransformerProvider";
-import type { TransformerListenerCallback } from "../types/TransformerProvider";
+import { Shape } from "../instances/Shape";
+
+export type TransformerEventBlank = {}
+export type TransformerEventTemplate = { childs: Shape[] }
+
+export type TransformerEventsMap = {
+    "resizestart": TransformerEventTemplate;
+    "resize": TransformerEventTemplate;
+    "resizeend": TransformerEventTemplate;
+    "movestart": TransformerEventTemplate;
+    "move": TransformerEventTemplate;
+    "moveend": TransformerEventTemplate;
+}
+
+export type TransformerEventsType = keyof TransformerEventsMap;
+export type TransformerListenerCallback<T extends TransformerEventsType> = (args: TransformerEventsMap[T]) => void;
 
 /**
  * Event provider for shape-related events with type-safe event handling.

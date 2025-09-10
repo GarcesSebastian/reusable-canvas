@@ -1,7 +1,14 @@
-import { IShape, Shape } from "../Shape";
+import { IShape, Shape, ShapeRawData } from "../Shape";
 import { Render } from "../../Render";
-import type { RectRawData } from "../../types/Raw";
 import { Vector } from "../common/Vector";
+
+export type RectRawData = ShapeRawData & {
+    width: number;
+    height: number;
+    color: string;
+    borderWidth: number;
+    borderColor: string;
+}
 
 /**
  * Interface for rectangular shape properties.
@@ -57,7 +64,7 @@ export class Rect extends Shape {
      * @param render - The main `Render` context for drawing operations.
      */
     public constructor(props: IRect, render: Render, id?: string) {
-        super(props, render, id);
+        super(props, render, "rect", id);
         this._ctx = render.ctx;
         this.width = props.width;
         this.height = props.height;
@@ -141,6 +148,25 @@ export class Rect extends Shape {
                localX <= this.width &&
                localY >= 0 && 
                localY <= this.height;
+    }
+
+    /**
+     * Gets a property of the rectangle.
+     * @param key - The property key to get.
+     * @returns The value of the property.
+     */
+    public get<K extends keyof IRect>(key: K): this[K] {
+        return this[key];
+    }
+
+    /**
+     * Sets a property of the rectangle.
+     * @param key - The property key to set.
+     * @param value - The value to set.
+     */
+    public set<K extends keyof IRect>(key: K, value: this[K]): this {
+        this[key] = value;
+        return this;
     }
 
     /**

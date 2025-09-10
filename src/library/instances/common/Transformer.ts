@@ -194,7 +194,7 @@ export class Transformer extends TransformerProvider {
                 position: this._position.copy()
             };
 
-            this.emit("resizestart", {})
+            this.emit("resizestart", { childs: Array.from(this._childs.values()) })
             return;
         }
 
@@ -203,7 +203,7 @@ export class Transformer extends TransformerProvider {
             this._isDragging = false;
             this._activeNode = null;
             this._lastMousePos = this._render.worldPosition();
-            this.emit("movestart", {})
+            this.emit("movestart", { childs: Array.from(this._childs.values()) })
         }
     }
 
@@ -221,7 +221,7 @@ export class Transformer extends TransformerProvider {
             this._childs.forEach(child => {
                 child.position = child.position.add(delta);
             });
-            this.emit("move", {})
+            this.emit("move", { childs: Array.from(this._childs.values()) })
             this._lastMousePos = currentMousePos;
             return;
         }
@@ -281,7 +281,7 @@ export class Transformer extends TransformerProvider {
                 }
             });
 
-            this.emit("resize", {})
+            this.emit("resize", { childs: Array.from(this._childs.values()) })
         }
     }
 
@@ -299,8 +299,8 @@ export class Transformer extends TransformerProvider {
         this._isMovingSelection = false;
         this._activeNode = null;
         this._originalData.clear();
-        this.emit("moveend", {})
-        this.emit("resizeend", {})
+        this.emit("moveend", { childs: Array.from(this._childs.values()) })
+        this.emit("resizeend", { childs: Array.from(this._childs.values()) })
     }
 
     /**

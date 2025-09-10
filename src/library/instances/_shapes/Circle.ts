@@ -1,7 +1,11 @@
-import { IShape, Shape } from "../Shape";
+import { IShape, Shape, ShapeRawData } from "../Shape";
 import { Render } from "../../Render";
 import { Vector } from "../common/Vector";
-import type { CircleRawData } from "../../types/Raw";
+
+export type CircleRawData = ShapeRawData & {
+    radius: number;
+    color: string;
+}
 
 /**
  * Interface for circular shape properties.
@@ -45,10 +49,29 @@ export class Circle extends Shape {
      * @param render - The main `Render` context for drawing operations.
      */
     public constructor(props: ICircle, render: Render, id?: string) {
-        super(props, render, id);
+        super(props, render, "circle", id);
         this._ctx = render.ctx;
         this.radius = props.radius ?? 10;
         this.color = props.color ?? "#fff";
+    }
+
+    /**
+     * Gets a property of the circle.
+     * @param key - The property key to get.
+     * @returns The value of the property.
+     */
+    public get<K extends keyof ICircle>(key: K): this[K] {
+        return this[key];
+    }
+
+    /**
+     * Sets a property of the circle.
+     * @param key - The property key to set.
+     * @param value - The value to set.
+     */
+    public set<K extends keyof ICircle>(key: K, value: this[K]): this {
+        this[key] = value;
+        return this;
     }
 
     /**

@@ -1,23 +1,27 @@
 import { RenderCreator } from "./helpers/Render.creator";
 import { Vector } from "./instances/common/Vector";
-import { Shape } from "./instances/Shape";
 import { RenderManager } from "./managers/Render.manager";
 import { RenderProvider } from "./providers/Render.provider";
 import { RenderConfiguration, type RenderConfigurationProps } from "./helpers/Render.config";
 import { Camera } from "./instances/common/Camera";
 import { History } from "./instances/utils/History";
 import { SnapSmart } from "./instances/utils/SnapSmart";
-import { CircleRawData, ImageRawData, RectRawData, ShapeRawData, TextRawData } from "./types/Raw";
-import { Rect } from "./instances/_shapes/Rect";
-import { Circle } from "./instances/_shapes/Circle";
-import { Text } from "./instances/_shapes/Text";
-import { Image } from "./instances/_shapes/Image";
+import { Shape, type ShapeRawData } from "./instances/Shape";
+import { Rect, type RectRawData } from "./instances/_shapes/Rect";
+import { Circle, type CircleRawData } from "./instances/_shapes/Circle";
+import { Text, type TextRawData } from "./instances/_shapes/Text";
+import { Image, type ImageRawData } from "./instances/_shapes/Image";
 import { Selection } from "./instances/utils/Selection";
 import { Transformer } from "./instances/common/Transformer";
 import { Database } from "./database/Database";
 import { ConfigurationSchema, NodeSchema } from "./types/Schemas";
-import { RenderProperties } from "./types/Render";
 import { Exporter } from "./instances/utils/Exporter";
+
+export interface RenderProperties {
+    zoom: number;
+    globalPosition: Vector;
+    offsetPan: Vector;
+}
 
 /**
  * Main rendering system class.
@@ -557,6 +561,185 @@ export class Render extends RenderProvider {
     }
 
     /**
+     * Debounced configuration save to prevent FPS drops during pan/zoom
+     * @private
+     */
+    private _debouncedConfigSave(): void {
+        if (this._configSaveTimeout) {
+            clearTimeout(this._configSaveTimeout);
+        }
+        
+        this._configSaveTimeout = window.setTimeout(() => {
+            this._executeConfigOnlySave();
+            this._configSaveTimeout = null;
+        }, 150);
+    }
+
+    /**
+     * Executes configuration-only save without progress callbacks for better FPS
+     * @private
+     */
+    private async _executeConfigOnlySave(): Promise<void> {
+        try {
+            if (!this.configuration.config.save) return;
+
+            if (this.configuration.config.save === "indexeddb") {
+                const configurationTable = this._database?.getTable("configurations" as never);
+                if (configurationTable) {
+                    await this._saveConfiguration(configurationTable);
+                }
+            } else if (this.configuration.config.save === "localstorage") {
+                localStorage.setItem("canvasConfiguration", JSON.stringify(this.getProperties()));
+            }
+        } catch (error) {
+            console.error('Error in config-only save:', error);
+        }
+    }
+
+    /**
+     * Executes the save operation.
+     * @private
+     */
+    private async _executeSave(history: boolean): Promise<void> {
+        try {
+            const newData = await this._serializeAsync();
+            const serializedString = JSON.stringify(newData);
+
+            const dataHasChanged = serializedString !== this._lastSerializedData;
+
+            this._saveCounter++;
+
+            if (history) {
+                this.history.save(newData);
+            }
+
+            if (!this.configuration.config.save) return;
+
+            if (this.configuration.config.save === "localstorage") {
+                await this._saveToLocalStorage(serializedString, dataHasChanged);
+            } else if (this.configuration.config.save === "indexeddb") {
+                await this._saveToIndexedDB(newData, dataHasChanged);
+            }
+
+            if (dataHasChanged) {
+                this._lastSerializedData = serializedString;
+            }
+
+        } catch (error) {
+            console.error('Error in _executeSave:', error);
+        }
+    }
+
+    /**
+     * Serializes the canvas data asynchronously.
+     * @private
+     */
+    private async _serializeAsync(): Promise<ShapeRawData[]> {
+        return new Promise((resolve) => {
+            if ('requestIdleCallback' in window) {
+                (window as any).requestIdleCallback(() => {
+                    resolve(this.serialize());
+                });
+            } else {
+                setTimeout(() => {
+                    resolve(this.serialize());
+                }, 0);
+            }
+        });
+    }
+
+    /**
+     * Save optimized for localStorage
+     * @private
+     */
+    private async _saveToLocalStorage(serializedString: string, dataHasChanged: boolean): Promise<void> {
+        const sizeKB = serializedString.length / 1024;
+        
+        if (this._saveCounter % 10 === 0) {
+            console.log(`Save #${this._saveCounter} - Size: ${sizeKB.toFixed(2)} KB`);
+        }
+
+        await new Promise<void>((resolve) => {
+            setTimeout(() => {
+                try {
+                    if (dataHasChanged) {
+                        localStorage.setItem("canvasData", serializedString);
+                    }
+                    localStorage.setItem("canvasConfiguration", JSON.stringify(this.getProperties()));
+                    resolve();
+                } catch (error) {
+                    console.error('Error saving to localStorage:', error);
+                    resolve();
+                }
+            }, 0);
+        });
+    }
+
+    /**
+     * Save optimized for IndexedDB using web workers
+     * @private
+     */
+    private async _saveToIndexedDB(newData: ShapeRawData[], dataHasChanged: boolean): Promise<void> {
+        try {
+            const table = this._database?.getTable("nodes" as never);
+            const configurationTable = this._database?.getTable("configurations" as never);
+            
+            if (!configurationTable || !table) {
+                console.warn('Database tables not available');
+                return;
+            }
+
+            const progressCallback = this.onSavingProgress;
+            
+            if (progressCallback) {
+                progressCallback({ p: 0, state: true });
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+
+            if (dataHasChanged) {
+                await table.putMany(newData as never, true, 50, progressCallback ? (progress) => {
+                    progressCallback({ p: progress.p * 0.9, state: true });
+                } : undefined);
+
+                if (progressCallback) {
+                    progressCallback({ p: 0.95, state: true });
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+            } else if (progressCallback) {
+                progressCallback({ p: 0.95, state: true });
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            
+            await this._saveConfiguration(configurationTable);
+            
+            if (progressCallback) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                progressCallback({ p: 1, state: false });
+            }
+
+        } catch (error) {
+            console.error('Error saving to IndexedDB:', error);
+            if (this.onSavingProgress) {
+                this.onSavingProgress({ p: 0, state: false });
+            }
+        }
+    }
+
+    /**
+     * Save configuration optimized
+     * @private
+     */
+    private async _saveConfiguration(configurationTable: any): Promise<void> {
+        try {
+            const configData = { id: "data", ...this.getProperties() };
+            
+            await configurationTable.put(configData as never);
+        } catch (error) {
+            console.error('Error saving configuration:', error);
+        }
+    }
+
+    /**
      * Clears the canvas to prepare it for the next frame.
      * @private
      */
@@ -639,11 +822,7 @@ export class Render extends RenderProvider {
      * Gets the database instance associated with this render.
      * @returns The database instance.
      */
-    public get database(): Database {
-        if (!this._database) {
-            throw new Error("Database not initialized");
-        }
-
+    public get database(): Database | null {
         return this._database;
     }
     
@@ -828,6 +1007,21 @@ export class Render extends RenderProvider {
         this.history.redo()
     }
 
+    public async getSizeData(format: "mb" | "kb" | "bytes"): Promise<number | null> {
+        let sizeMB = null;
+        if (this.configuration.config.save === "localstorage") {
+            sizeMB = new Blob([JSON.stringify(this.serialize())]).size / (1024 * 1024);
+        } else if(this.configuration.config.save === "indexeddb") {
+            sizeMB = await this.database?.getDatabaseSizeMB() ?? 0;
+        }
+
+        if (sizeMB && format === "mb") return sizeMB;
+        if (sizeMB && format === "kb") return sizeMB * 1024;
+        if (sizeMB && format === "bytes") return sizeMB * 1024 * 1024;
+
+        return sizeMB
+    }
+
     /**
      * Automatically saves the current state of the canvas.
      * @param history - If true, adds the save to history; otherwise just saves without adding to history.
@@ -837,185 +1031,6 @@ export class Render extends RenderProvider {
             this._debouncedConfigSave();
         } else {
             this._executeSave(history);
-        }
-    }
-
-    /**
-     * Debounced configuration save to prevent FPS drops during pan/zoom
-     * @private
-     */
-    private _debouncedConfigSave(): void {
-        if (this._configSaveTimeout) {
-            clearTimeout(this._configSaveTimeout);
-        }
-        
-        this._configSaveTimeout = window.setTimeout(() => {
-            this._executeConfigOnlySave();
-            this._configSaveTimeout = null;
-        }, 150);
-    }
-
-    /**
-     * Executes configuration-only save without progress callbacks for better FPS
-     * @private
-     */
-    private async _executeConfigOnlySave(): Promise<void> {
-        try {
-            if (!this.configuration.config.save) return;
-
-            if (this.configuration.config.save === "indexeddb") {
-                const configurationTable = this._database?.getTable("configurations" as never);
-                if (configurationTable) {
-                    await this._saveConfiguration(configurationTable);
-                }
-            } else if (this.configuration.config.save === "localstorage") {
-                localStorage.setItem("canvasConfiguration", JSON.stringify(this.getProperties()));
-            }
-        } catch (error) {
-            console.error('Error in config-only save:', error);
-        }
-    }
-
-    /**
-     * Executes the save operation.
-     * @private
-     */
-    private async _executeSave(history: boolean): Promise<void> {
-        try {
-            const newData = await this._serializeAsync();
-            const serializedString = JSON.stringify(newData);
-
-            const dataHasChanged = serializedString !== this._lastSerializedData;
-
-            this._saveCounter++;
-
-            if (history) {
-                this.history.save(newData);
-            }
-
-            if (!this.configuration.config.save) return;
-
-            if (this.configuration.config.save === "localstorage") {
-                await this._saveToLocalStorage(serializedString, dataHasChanged);
-            } else if (this.configuration.config.save === "indexeddb") {
-                await this._saveToIndexedDB(newData, dataHasChanged);
-            }
-
-            if (dataHasChanged) {
-                this._lastSerializedData = serializedString;
-            }
-
-        } catch (error) {
-            console.error('Error in _executeSave:', error);
-        }
-    }
-
-    /**
-     * Serializes the canvas data asynchronously.
-     * @private
-     */
-    private async _serializeAsync(): Promise<ShapeRawData[]> {
-        return new Promise((resolve) => {
-            if ('requestIdleCallback' in window) {
-                (window as any).requestIdleCallback(() => {
-                    resolve(this.serialize());
-                });
-            } else {
-                setTimeout(() => {
-                    resolve(this.serialize());
-                }, 0);
-            }
-        });
-    }
-
-    /**
-     * Save optimized for localStorage
-     * @private
-     */
-    private async _saveToLocalStorage(serializedString: string, dataHasChanged: boolean): Promise<void> {
-        const sizeKB = serializedString.length / 1024;
-        
-        if (this._saveCounter % 10 === 0) {
-            console.log(`Save #${this._saveCounter} - Size: ${sizeKB.toFixed(2)} KB`);
-        }
-
-        await new Promise<void>((resolve) => {
-            setTimeout(() => {
-                try {
-                    if (dataHasChanged) {
-                        localStorage.setItem("canvasData", serializedString);
-                    }
-                    localStorage.setItem("canvasConfiguration", JSON.stringify(this.getProperties()));
-                    resolve();
-                } catch (error) {
-                    console.error('Error saving to localStorage:', error);
-                    resolve();
-                }
-            }, 0);
-        });
-    }
-
-    /**
-     * Save optimized for IndexedDB using web workers
-     * @private
-     */
-    private async _saveToIndexedDB(newData: ShapeRawData[], dataHasChanged: boolean): Promise<void> {
-        try {
-            const table = this._database?.getTable("nodes" as never);
-            const configurationTable = this._database?.getTable("configurations" as never);
-            
-            if (!configurationTable || !table) {
-                console.warn('Database tables not available');
-                return;
-            }
-
-            const progressCallback = this.onSavingProgress;
-            
-            if (progressCallback) {
-                progressCallback({ p: 0, state: true });
-                await new Promise(resolve => setTimeout(resolve, 50));
-            }
-
-            if (dataHasChanged) {
-                await table.putMany(newData as never, true, 50, progressCallback ? (progress) => {
-                    progressCallback({ p: progress.p * 0.9, state: true });
-                } : undefined);
-
-                if (progressCallback) {
-                    progressCallback({ p: 0.95, state: true });
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                }
-            } else if (progressCallback) {
-                progressCallback({ p: 0.95, state: true });
-                await new Promise(resolve => setTimeout(resolve, 50));
-            }
-            
-            await this._saveConfiguration(configurationTable);
-            
-            if (progressCallback) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-                progressCallback({ p: 1, state: false });
-            }
-
-        } catch (error) {
-            console.error('Error saving to IndexedDB:', error);
-            if (this.onSavingProgress) {
-                this.onSavingProgress({ p: 0, state: false });
-            }
-        }
-    }
-
-    /**
-     * Save configuration optimized
-     * @private
-     */
-    private async _saveConfiguration(configurationTable: any): Promise<void> {
-        try {
-            const configData = { id: "data", ...this.getProperties() };
-            
-            await configurationTable.put(configData as never);
-        } catch (error) {
-            console.error('Error saving configuration:', error);
         }
     }
 
@@ -1136,8 +1151,6 @@ export class Render extends RenderProvider {
             if (this.onLoadProgress) {
                 this.onLoadProgress({ p: 1, state: false });
             }
-
-            this.database.getDatabaseSizeMB(true).then((size) => console.log(`Tamaño de la base de datos: ${size.toFixed(2)} MB`));
         } catch (error) {
             console.error("Error loading canvas data:", error);
             if (this.onLoadProgress) {

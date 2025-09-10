@@ -3,7 +3,16 @@ import { Vector } from "./common/Vector";
 import { Render } from "../Render";
 import { ShapeManager } from "../managers/Shape.manager";
 import { ShapeProvider } from "../providers/Shape.provider";
-import type { ShapeRawData } from '../types/Raw';
+
+export type ShapeRawData = {
+    id: string;
+    type: ShapeType;
+    position: Vector;
+    rotation: number;
+    zIndex: number;
+    dragging: boolean;
+    visible: boolean;
+}
 
 export interface IShape {
     position: Vector;
@@ -12,6 +21,8 @@ export interface IShape {
     dragging?: boolean;
     visible?: boolean;
 }
+
+export type ShapeType = "circle" | "rect" | "text" | "image";
 
 /**
  * Abstract base class for all shape primitives in the rendering system.
@@ -26,7 +37,9 @@ export abstract class Shape extends ShapeProvider {
     protected _render: Render;
     /** Unique identifier for the shape instance (UUID v4). */
     private _id: string;
-    
+    /** The type of the shape. */    
+    private _type: ShapeType;
+
     /** Position vector of the shape's origin (top-left corner) in pixels. */
     public position: Vector;
     /** The stacking order of the shape. Higher values are drawn on top. */
@@ -61,7 +74,7 @@ export abstract class Shape extends ShapeProvider {
      * @param props.visible - Initial visibility. Defaults to true.
      * @param render - The main `Render` context for drawing operations.
      */
-    public constructor(props: IShape, render: Render, id?: string) {
+    public constructor(props: IShape, render: Render, type: ShapeType, id?: string) {
         super();
         this.position = props.position ?? new Vector(0, 0);
         this.zIndex = props.zIndex ?? 0;
@@ -70,6 +83,7 @@ export abstract class Shape extends ShapeProvider {
         this.manager = new ShapeManager(this);
         this.dragging = props.dragging ?? false;
         this.visible = props.visible ?? true;
+        this._type = type;
 
         this._render = render;
         this._render.manager.addChild(this);
@@ -87,11 +101,11 @@ export abstract class Shape extends ShapeProvider {
     }
 
     /**
-     * Sets the unique identifier for this shape.
-     * @param id - The new UUID string identifier.
+     * Gets the type of the shape.
+     * @returns The type of the shape.
      */
-    public set id(id: string) {
-        this._id = id;
+    public get type() : ShapeType {
+        return this._type;
     }
 
     /**
@@ -103,9 +117,19 @@ export abstract class Shape extends ShapeProvider {
     }
 
     /**
-     * Raises the zIndex of the shape by 1.
-     * @returns The shape instance.
+     * Gets a property of the shape.
+     * @param key - The property key to get.
+     * @returns The value of the property.
      */
+    public abstract get<K extends keyof IShape>(key: K): IShape[K]; 
+
+    /**
+     * Sets a property of the shape.
+     * @param key - The property key to set.
+     * @param value - The value to set.
+     */
+    public abstract set<K extends keyof IShape>(key: K, value: IShape[K]): this;
+
     /**
      * Raises the zIndex of the shape by 1.
      * @returns The shape instance.

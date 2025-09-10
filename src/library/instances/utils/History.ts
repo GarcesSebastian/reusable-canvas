@@ -1,5 +1,5 @@
 import { Render } from "../../Render";
-import { ShapeRawData } from "../../types/Raw";
+import { ShapeRawData } from "../Shape";
 
 /**
  * History management class for undo/redo operations.

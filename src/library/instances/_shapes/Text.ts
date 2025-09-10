@@ -1,7 +1,22 @@
 import { Render } from "../../Render";
-import { TextRawData } from "../../types/Raw";
 import { Vector } from "../common/Vector";
-import { Shape, IShape } from "../Shape";
+import { Shape, IShape, ShapeRawData } from "../Shape";
+
+export type TextRawData = ShapeRawData & {
+    text: string;
+    fontSize: number;
+    fontFamily: string;
+    fontWeight: string;
+    fontStyle: string;
+    textAlign: string;
+    color: string;
+    backgroundColor: string;
+    borderWidth: number;
+    borderColor: string;
+    padding: { top: number; right: number; bottom: number; left: number };
+    width: number;
+    height: number;
+}
 
 /**
  * Interface for text shape properties.
@@ -97,7 +112,7 @@ export class Text extends Shape {
      * @param id - Optional unique identifier for the text element.
      */
     public constructor(DataText: IText, render: Render, id?: string) {
-        super(DataText, render, id);
+        super(DataText, render, "text", id);
 
         this.value = DataText.text;
         this.fontSize = DataText.fontSize;
@@ -543,6 +558,25 @@ export class Text extends Shape {
         }
         
         return false;
+    }
+
+    /**
+     * Gets a property of the text.
+     * @param key - The property key to get.
+     * @returns The value of the property.
+     */
+    public get<K extends keyof IText>(key: K): IText[K] {
+        return this[key as keyof this] as unknown as IText[K];
+    }
+
+    /**
+     * Sets a property of the text.
+     * @param key - The property key to set.
+     * @param value - The value to set.
+     */
+    public set<K extends keyof IText>(key: K, value: IText[K]): this {
+        (this[key as keyof this] as unknown as IText[K]) = value;
+        return this;
     }
 
     /**

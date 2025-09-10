@@ -1,13 +1,12 @@
 import { Vector } from "../instances/common/Vector";
-import { Shape } from "../instances/Shape";
 import { Render } from "../Render";
-import { CircleRawData, ImageRawData, RectRawData, ShapeRawData, TextRawData } from "../types/Raw";
 import { v4 as uuidv4 } from "uuid";
-import type { RenderEventsType } from "../types/RenderProvider";
-import { Rect } from "../instances/_shapes/Rect";
-import { Circle } from "../instances/_shapes/Circle";
-import { Text } from "../instances/_shapes/Text";
-import { Image } from "../instances/_shapes/Image";
+import type { RenderEventsType } from "../providers/Render.provider";
+import { Shape, type ShapeRawData } from "../instances/Shape";
+import { Rect, type RectRawData } from "../instances/_shapes/Rect";
+import { Circle, type CircleRawData } from "../instances/_shapes/Circle";
+import { Text, type TextRawData } from "../instances/_shapes/Text";
+import { Image, type ImageRawData } from "../instances/_shapes/Image";
 
 /**
  * Interface defining keyboard shortcut mappings for canvas operations.

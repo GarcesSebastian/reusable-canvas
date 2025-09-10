@@ -1,7 +1,15 @@
-import { IShape, Shape } from "../Shape";
+import { IShape, Shape, ShapeRawData } from "../Shape";
 import { Render } from "../../Render";
-import { ImageRawData } from "../../types/Raw";
 import { Vector } from "../common/Vector";
+
+export type ImageRawData = ShapeRawData & {
+    src: string;
+    width: number;
+    height: number;
+    borderWidth: number;
+    borderColor: string;
+    cornerRadius: number;
+}
 
 /** Interface for image shape properties. */
 export interface IImage extends IShape {
@@ -77,7 +85,7 @@ export class Image extends Shape {
      * @param id - Optional unique identifier for the shape.
      */
     public constructor(props: IImage, render: Render, id?: string) {
-        super(props, render, id);
+        super(props, render, "image", id);
 
         this._ctx = render.ctx;
         this.src = props.src;
@@ -260,6 +268,25 @@ export class Image extends Shape {
                localX <= this.width &&
                localY >= 0 && 
                localY <= this.height;
+    }
+
+    /**
+     * Gets a property of the image.
+     * @param key - The property key to get.
+     * @returns The value of the property.
+     */
+    public get<K extends keyof IImage>(key: K): this[K] {
+        return this[key];
+    }
+
+    /**
+     * Sets a property of the image.
+     * @param key - The property key to set.
+     * @param value - The value to set.
+     */
+    public set<K extends keyof IImage>(key: K, value: this[K]): this {
+        this[key] = value;
+        return this;
     }
 
     /**
