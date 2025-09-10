@@ -131,6 +131,13 @@ export abstract class Shape extends ShapeProvider {
     public abstract set<K extends keyof IShape>(key: K, value: IShape[K]): this;
 
     /**
+     * Checks if the shape has a specific property.
+     * @param key - The property key to check.
+     * @returns `true` if the shape has the property, otherwise `false`.
+     */
+    public abstract has(key: keyof IShape): boolean;
+
+    /**
      * Raises the zIndex of the shape by 1.
      * @returns The shape instance.
      */

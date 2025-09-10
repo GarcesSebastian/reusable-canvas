@@ -1,5 +1,5 @@
 import { Render } from "../../Render";
-import { Shape } from "../Shape";
+import { IShape, Shape } from "../Shape";
 import { Rect } from "../_shapes/Rect";
 import { Circle } from "../_shapes/Circle";
 import { Text } from "../_shapes/Text";
@@ -21,6 +21,17 @@ export interface ITransformer {
     nodeBorderColor?: string;
     nodeSize?: number;
     padding?: Padding;
+    rotation?: number;
+    target?: boolean;
+    targetColor?: string;
+    targetBackgroundColor?: string;
+    targetBorderWidth?: number;
+    targetBorderColor?: string;
+    targetRadius?: number;
+    targetFontSize?: number;
+    targetFontFamily?: string;
+    targetFontWeight?: string;
+    targetFontStyle?: string;
 }
 
 /**
@@ -56,6 +67,28 @@ export class Transformer extends TransformerProvider {
     public nodeBorderColor: string;
     /** Configuration for the transformer's appearance. */
     public nodeSize: number;
+    /** Configuration for the transformer's appearance. */
+    public rotation: number;
+    /** Configuration for the transformer's appearance. */
+    public target: boolean;
+    /** Configuration for the transformer's appearance. */
+    public targetColor: string;
+    /** Configuration for the transformer's appearance. */
+    public targetBackgroundColor: string;
+    /** Configuration for the transformer's appearance. */
+    public targetBorderWidth: number;
+    /** Configuration for the transformer's appearance. */
+    public targetBorderColor: string;
+    /** Configuration for the transformer's appearance. */
+    public targetRadius: number;
+    /** Configuration for the transformer's appearance. */
+    public targetFontSize: number;
+    /** Configuration for the transformer's appearance. */
+    public targetFontFamily: string;
+    /** Configuration for the transformer's appearance. */
+    public targetFontWeight: string;
+    /** Configuration for the transformer's appearance. */
+    public targetFontStyle: string;
 
     /** Current position of the transformer's top-left corner. */
     private _position: Vector = new Vector(0, 0);
@@ -63,11 +96,19 @@ export class Transformer extends TransformerProvider {
     private _width: number = 0;
     /** Current height of the transformer boundary. */
     private _height: number = 0;
+    /** Minimum width of the transformer boundary. */
+    private _minWidth: number = 100;
+    /** Minimum height of the transformer boundary. */
+    private _minHeight: number = 100;
 
     /** Template positions for transformation nodes (0-1 normalized coordinates). */
     private _nodesBoxTemplate: Map<string, Vector> = new Map();
+    /** Template positions for transformation nodes (0-1 normalized coordinates). */
+    private _nodesBoxTemplateRadius: Map<string, Vector> = new Map();
     /** Actual screen positions and sizes of transformation nodes. */
     private _nodesBox: Map<string, NodeBox> = new Map();
+    /** Actual screen positions and sizes of transformation nodes. */
+    private _nodesBoxRadius: Map<string, Vector> = new Map();
 
     /** Indicates if currently resizing via transformation nodes. */
     private _isDragging: boolean = false;
@@ -99,6 +140,17 @@ export class Transformer extends TransformerProvider {
         this.nodeBorderWidth = DataTransformer?.nodeBorderWidth ?? 2;
         this.nodeBorderColor = DataTransformer?.nodeBorderColor ?? "#00ff00";
         this.nodeSize = DataTransformer?.nodeSize ?? 10;
+        this.rotation = DataTransformer?.rotation ?? 0;
+        this.target = DataTransformer?.target ?? false;
+        this.targetColor = DataTransformer?.targetColor ?? "#00ff00";
+        this.targetBackgroundColor = DataTransformer?.targetBackgroundColor ?? "#00ff00";
+        this.targetBorderWidth = DataTransformer?.targetBorderWidth ?? 2;
+        this.targetBorderColor = DataTransformer?.targetBorderColor ?? "#00ff00";
+        this.targetRadius = DataTransformer?.targetRadius ?? 10;
+        this.targetFontSize = DataTransformer?.targetFontSize ?? 10;
+        this.targetFontFamily = DataTransformer?.targetFontFamily ?? "sans-serif";
+        this.targetFontWeight = DataTransformer?.targetFontWeight ?? "bold";
+        this.targetFontStyle = DataTransformer?.targetFontStyle ?? "normal";
 
         this._setup();
     }
@@ -126,6 +178,11 @@ export class Transformer extends TransformerProvider {
         this._nodesBoxTemplate.set("bottom-left", new Vector(0, 1));
         this._nodesBoxTemplate.set("bottom-center", new Vector(0.5, 1));
         this._nodesBoxTemplate.set("bottom-right", new Vector(1, 1));
+
+        this._nodesBoxTemplateRadius.set("top-left", new Vector(0, 0));
+        this._nodesBoxTemplateRadius.set("top-right", new Vector(1, 0));
+        this._nodesBoxTemplateRadius.set("bottom-left", new Vector(0, 1));
+        this._nodesBoxTemplateRadius.set("bottom-right", new Vector(1, 1));
     }
 
     /**
@@ -397,6 +454,7 @@ export class Transformer extends TransformerProvider {
 
         return null;
     }
+        
 
     /**
      * Calculates the bounding box that encompasses all selected shapes.
@@ -469,6 +527,44 @@ export class Transformer extends TransformerProvider {
     }
 
     /**
+     * Calculates the screen positions of all transformation nodes.
+     * Updates node positions based on current transformer bounds and zoom level.
+     * @private
+     */
+    private _calculateNodesBoxRadius(): void {
+        this._nodesBoxRadius.clear();
+
+        const boxX = this._position.x - this.padding.left;
+        const boxY = this._position.y - this.padding.top;
+        const boxWidth = this._width + this.padding.left + this.padding.right;
+        const boxHeight = this._height + this.padding.top + this.padding.bottom;
+        const margin = 15;
+
+        this._nodesBoxTemplateRadius.forEach((node: Vector, key: string) => {
+            let umbralX = margin;
+            let umbralY = margin;
+            
+            if (key === "top-left") {
+                umbralX = umbralX;
+                umbralY = umbralY;
+            } else if (key === "top-right") {
+                umbralX = -umbralX;
+                umbralY = umbralY;
+            } else if (key === "bottom-left") {
+                umbralX = umbralX;
+                umbralY = -umbralY;
+            } else if (key === "bottom-right") {
+                umbralX = -umbralX;
+                umbralY = -umbralY;
+            }
+
+            const posX = boxX + umbralX / this._render.zoom + node.x * boxWidth;
+            const posY = boxY + umbralY / this._render.zoom + node.y * boxHeight;
+            this._nodesBoxRadius.set(key, new Vector(posX, posY));
+        })
+    }
+
+    /**
      * Renders the transformer boundary box.
      * Draws a green outline around the selected shapes.
      * @private
@@ -482,14 +578,66 @@ export class Transformer extends TransformerProvider {
         const height = this._height + this.padding.top + this.padding.bottom;
         const offset = this._render.getOffset();
 
+        const posFinal = new Vector(posX - offset.x, posY - offset.y);
+
         this._render.ctx.save()
+        this._render.ctx.translate(posFinal.x, posFinal.y);
+        this._render.ctx.rotate(this._render.transformer.rotation);
 
         this._render.ctx.beginPath()
-        this._render.ctx.rect(posX - offset.x, posY - offset.y, width, height)
+        this._render.ctx.rect(0, 0, width, height)
         this._render.ctx.strokeStyle = this.borderColor
         this._render.ctx.lineWidth = this.borderWidth / this._render.zoom
         this._render.ctx.stroke()
         this._render.ctx.closePath()
+
+        if (!this.target) {
+            this._render.ctx.restore();
+            return;
+        }
+
+        const text = `${this._width.toFixed(0)} x ${this._height.toFixed(0)}`;
+        const scaledFontSize = this.targetFontSize / this._render.zoom;
+        
+        this._render.ctx.save();
+        this._render.ctx.font = `${this.targetFontStyle} ${this.targetFontWeight} ${scaledFontSize}px ${this.targetFontFamily}`;
+        
+        const metrics = this._render.ctx.measureText(text);
+        const textWidth = metrics.width;
+        
+        const ascent = scaledFontSize * 0.8;
+        const descent = scaledFontSize * 0.2;
+        const textHeight = ascent + descent;
+        
+        this._render.ctx.restore();
+        
+        const marginTop = 10 / this._render.zoom;
+        const padding = 2 / this._render.zoom;
+        
+        const rectW = textWidth + padding * 2;
+        const rectH = textHeight + padding * 2;
+        const rectX = width / 2 - rectW / 2;
+        const rectY = height + marginTop;
+        
+        const textX = rectX + padding;
+        const textY = rectY + padding + ascent;
+        
+        this._render.ctx.beginPath();
+        this._render.ctx.roundRect(rectX, rectY, rectW, rectH, 3 / this._render.zoom);
+        this._render.ctx.fillStyle = this.targetBackgroundColor;
+        this._render.ctx.strokeStyle = this.targetBorderColor;
+        this._render.ctx.lineWidth = this.targetBorderWidth / this._render.zoom;
+        this._render.ctx.fill();
+        this._render.ctx.stroke();
+        this._render.ctx.closePath();
+        
+        this._render.ctx.beginPath();
+        this._render.ctx.fillStyle = this.targetColor;
+        this._render.ctx.font = `${this.targetFontStyle} ${this.targetFontWeight} ${scaledFontSize}px ${this.targetFontFamily}`;
+        this._render.ctx.textAlign = "left";
+        this._render.ctx.textBaseline = "alphabetic";
+        this._render.ctx.fillText(text, textX, textY);
+        this._render.ctx.closePath();
 
         this._render.ctx.restore()
     }
@@ -501,6 +649,7 @@ export class Transformer extends TransformerProvider {
      */
     private _updateNodes(): void {
         if (this._childs.size === 0 || this._isHidden) return;
+
         const offset = this._render.getOffset();
 
         this._nodesBox.forEach((node: NodeBox) => {
@@ -522,6 +671,60 @@ export class Transformer extends TransformerProvider {
 
             this._render.ctx.restore()
         })
+    }
+
+    /**
+     * Updates the radius nodes of the transformer.
+     * @private
+     */
+    private _updateNodesRadius(): void {
+        const child = this._childs.values().next().value;
+        const widthScaled = this._width * this._render.zoom;
+        const heightScaled = this._height * this._render.zoom;
+        if (this._childs.size !== 1 || this._isHidden || !child?.has("borderRadius" as keyof IShape) || widthScaled <= this._minWidth || heightScaled <= this._minHeight) return;
+        
+        const offset = this._render.getOffset();
+        const radius = 5 / this._render.zoom;
+
+        this._nodesBoxRadius.forEach((node: Vector) => {
+            this._render.ctx.save()
+
+            this._render.ctx.beginPath()
+            this._render.ctx.arc(
+                node.x - offset.x,
+                node.y - offset.y,
+                radius,
+                0,
+                Math.PI * 2
+            )
+            this._render.ctx.fillStyle = this.nodeColor
+            this._render.ctx.strokeStyle = this.nodeBorderColor
+            this._render.ctx.lineWidth = this.nodeBorderWidth / this._render.zoom
+            this._render.ctx.fill()
+            this._render.ctx.stroke()
+            this._render.ctx.closePath()
+
+            this._render.ctx.restore()
+        })
+    }
+
+    /**
+     * Gets a property of the transformer.
+     * @param key - The property key to get.
+     * @returns The value of the property.
+     */
+    public get<K extends keyof ITransformer>(key: K): ITransformer[K] {
+        return this[key as keyof this] as unknown as ITransformer[K];
+    }
+
+    /**
+     * Sets a property of the transformer.
+     * @param key - The property key to set.
+     * @param value - The value to set.
+     */
+    public set<K extends keyof ITransformer>(key: K, value: ITransformer[K]): this {
+        (this[key as keyof this] as unknown as ITransformer[K]) = value;
+        return this;
     }
 
     /**
@@ -584,8 +787,10 @@ export class Transformer extends TransformerProvider {
 
         this._calculateBox();
         this._calculateNodesBox();
+        this._calculateNodesBoxRadius();
         this._updateBox();
         this._updateNodes();
+        this._updateNodesRadius();
     }
 
     /**
@@ -600,6 +805,16 @@ export class Transformer extends TransformerProvider {
         this.nodeSize = DataTransformer?.nodeSize ?? this.nodeSize;
         this.nodeBorderWidth = DataTransformer?.nodeBorderWidth ?? this.nodeBorderWidth;
         this.nodeBorderColor = DataTransformer?.nodeBorderColor ?? this.nodeBorderColor;
+        this.target = DataTransformer?.target ?? this.target;
+        this.targetColor = DataTransformer?.targetColor ?? this.targetColor;
+        this.targetBackgroundColor = DataTransformer?.targetBackgroundColor ?? this.targetBackgroundColor;
+        this.targetBorderWidth = DataTransformer?.targetBorderWidth ?? this.targetBorderWidth;
+        this.targetBorderColor = DataTransformer?.targetBorderColor ?? this.targetBorderColor;
+        this.targetRadius = DataTransformer?.targetRadius ?? this.targetRadius;
+        this.targetFontSize = DataTransformer?.targetFontSize ?? this.targetFontSize;
+        this.targetFontFamily = DataTransformer?.targetFontFamily ?? this.targetFontFamily;
+        this.targetFontWeight = DataTransformer?.targetFontWeight ?? this.targetFontWeight;
+        this.targetFontStyle = DataTransformer?.targetFontStyle ?? this.targetFontStyle;
     }
 
     public hide(): void {

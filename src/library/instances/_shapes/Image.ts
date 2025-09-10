@@ -8,7 +8,7 @@ export type ImageRawData = ShapeRawData & {
     height: number;
     borderWidth: number;
     borderColor: string;
-    cornerRadius: number;
+    borderRadius: number;
 }
 
 /** Interface for image shape properties. */
@@ -24,7 +24,7 @@ export interface IImage extends IShape {
     /** Border color (default: "black"). */
     borderColor?: string;
     /** Corner radius for rounded corners (default: 0). */
-    cornerRadius?: number;
+    borderRadius?: number;
 }
 
 /**
@@ -39,7 +39,7 @@ export interface IImage extends IShape {
  *     position: new Vector(100, 100),
  *     width: 200,
  *     height: 150,
- *     cornerRadius: 10,
+ *     borderRadius: 10,
  *     borderWidth: 2,
  *     borderColor: "blue"
  * }, render);
@@ -59,8 +59,8 @@ export class Image extends Shape {
     public borderWidth: number;
     /** Border color of the image. */
     public borderColor: string;
-    /** Corner radius for rounded corners. */
-    public cornerRadius: number;
+    /** Border radius for rounded corners. */
+    public borderRadius: number;
 
     /** Whether the image is currently loading. */
     private _isLoading: boolean = true;
@@ -93,7 +93,7 @@ export class Image extends Shape {
         this.height = props.height ?? 100;
         this.borderWidth = props.borderWidth ?? 0;
         this.borderColor = props.borderColor ?? "black";
-        this.cornerRadius = props.cornerRadius ?? 0;
+        this.borderRadius = props.borderRadius ?? 0;
 
         if (!props.width || !props.height) this._dimensionDefined = false;
 
@@ -290,6 +290,15 @@ export class Image extends Shape {
     }
 
     /**
+     * Checks if the image has a specific property.
+     * @param key - The property key to check.
+     * @returns `true` if the image has the property, otherwise `false`.
+     */
+    public has(key: keyof IImage): boolean {
+        return key in this;
+    }
+
+    /**
      * Draws the image on the canvas with its current properties.
      */
     public draw(): void {
@@ -311,7 +320,7 @@ export class Image extends Shape {
         this._ctx.translate(this.position.x - offset.x, this.position.y - offset.y);
         this._ctx.rotate(this.rotation);
     
-        const radius = this.cornerRadius ?? 0;
+        const radius = this.borderRadius ?? 0;
         const w = this.width;
         const h = this.height;
     
@@ -388,7 +397,7 @@ export class Image extends Shape {
             src: this.src,
             borderWidth: this.borderWidth,
             borderColor: this.borderColor,
-            cornerRadius: this.cornerRadius,
+            borderRadius: this.borderRadius,
         };
     }
 
@@ -408,7 +417,7 @@ export class Image extends Shape {
         image.src = data.src;
         image.borderWidth = data.borderWidth;
         image.borderColor = data.borderColor;
-        image.cornerRadius = data.cornerRadius;
+        image.borderRadius = data.borderRadius;
 
         render.emit("create", { shape: image });
         

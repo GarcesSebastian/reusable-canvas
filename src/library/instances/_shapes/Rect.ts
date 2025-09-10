@@ -8,6 +8,7 @@ export type RectRawData = ShapeRawData & {
     color: string;
     borderWidth: number;
     borderColor: string;
+    borderRadius: number;
 }
 
 /**
@@ -25,6 +26,7 @@ export interface IRect extends IShape {
     color?: string;
     borderWidth?: number;
     borderColor?: string;
+    borderRadius?: number;
 }
 
 /**
@@ -52,6 +54,8 @@ export class Rect extends Shape {
     public borderWidth: number;
     /** Color of the border (CSS color string). */
     public borderColor: string;
+    /** Radius of the border in pixels. */
+    public borderRadius: number;
 
     /**
      * Creates a new rectangular shape.
@@ -71,6 +75,7 @@ export class Rect extends Shape {
         this.color = props.color ?? "white";
         this.borderWidth = props.borderWidth ?? 0;
         this.borderColor = props.borderColor ?? "transparent";
+        this.borderRadius = props.borderRadius ?? 0;
     }
 
     /**
@@ -170,6 +175,15 @@ export class Rect extends Shape {
     }
 
     /**
+     * Checks if the rectangle has a specific property.
+     * @param key - The property key to check.
+     * @returns `true` if the rectangle has the property, otherwise `false`.
+     */
+    public has(key: keyof IRect): boolean {
+        return key in this;
+    }
+
+    /**
      * Draws the rectangle on the canvas with its current properties.
      * This method applies position, rotation, and styling (fill and border).
      *
@@ -187,7 +201,7 @@ export class Rect extends Shape {
 
         this._ctx.beginPath();
 
-        this._ctx.rect(0, 0, this.width, this.height);
+        this._ctx.roundRect(0, 0, this.width, this.height, this.borderRadius / this._render.zoom);
         this._ctx.fillStyle = this.color;
         this._ctx.fill();
 
@@ -242,6 +256,7 @@ export class Rect extends Shape {
             color: this.color,
             borderWidth: this.borderWidth,
             borderColor: this.borderColor,
+            borderRadius: this.borderRadius
         };
     }
 

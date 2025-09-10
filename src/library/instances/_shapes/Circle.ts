@@ -75,6 +75,15 @@ export class Circle extends Shape {
     }
 
     /**
+     * Checks if the circle has a specific property.
+     * @param key - The property key to check.
+     * @returns `true` if the circle has the property, otherwise `false`.
+     */
+    public has(key: keyof ICircle): boolean {
+        return key in this;
+    }
+
+    /**
      * Draws the circle on the canvas with its current properties.
      * This method applies position and fill color.
      *

@@ -29,6 +29,12 @@ export interface Keys {
     back: string,
 }
 
+export interface Properties {
+    minZoom: number,
+    maxZoom: number,
+    zoomFactor: number,
+}
+
 export type AutoSaveMethods = "localstorage" | "indexeddb" | null
 
 /**
@@ -36,14 +42,15 @@ export type AutoSaveMethods = "localstorage" | "indexeddb" | null
  * Controls which features are enabled and defines keyboard shortcuts.
  */
 export interface RenderConfigurationProps {
-    history?: boolean,
-    pan?: boolean,
-    zoom?: boolean,
-    snap?: boolean,
-    transform?: boolean,
-    selection?: boolean,
-    save?: AutoSaveMethods,
-    keywords?: Keys   
+    history: boolean,
+    pan: boolean,
+    zoom: boolean,
+    snap: boolean,
+    transform: boolean,
+    selection: boolean,
+    save: AutoSaveMethods,
+    keywords: Keys,
+    properties: Properties
 }
 
 /**
@@ -82,17 +89,11 @@ export class RenderConfiguration {
      * @param render - The main Render context.
      * @param config - Optional configuration options. If not provided, defaults will be used.
      */
-    public constructor(render: Render, config?: RenderConfigurationProps) {
+    public constructor(render: Render, config?: Partial<RenderConfigurationProps>) {
         this._render = render;
-        this._config = config || {
-            history: false,
-            pan: false,
-            zoom: false,
-            snap: false,
-            transform: false,
-            selection: false,
-            save: null,
-            keywords: RenderConfiguration.defaultKeyWords()
+        this._config = {
+            ...RenderConfiguration.defaultConfig(),
+            ...config
         }
 
         this._boundHandleKeyDown = this._handleKeyDown.bind(this);
@@ -264,8 +265,11 @@ export class RenderConfiguration {
      * @param config - New configuration options to apply.
      * @returns The RenderConfiguration instance for method chaining.
      */
-    public load(config: RenderConfigurationProps): RenderConfiguration {
-        this._config = config
+    public load(config: Partial<RenderConfigurationProps>): RenderConfiguration {
+        this._config = {
+            ...this._config,
+            ...config
+        }
         this.setup()
         return this
     }
@@ -462,6 +466,22 @@ export class RenderConfiguration {
     }
 
     /**
+     * Returns the current properties configuration.
+     * @returns The current properties settings.
+     */
+    public getProperties(): Properties {
+        return this._config.properties;
+    }
+
+    /**
+     * Returns the current keywords configuration.
+     * @returns The current keywords settings.
+     */
+    public getKeywords(): Keys {
+        return this._config.keywords;
+    }
+
+    /**
      * Returns the default keyboard shortcuts for common canvas operations.
      * @returns Default key mappings for standard operations.
      */
@@ -480,6 +500,36 @@ export class RenderConfiguration {
             bottom: "ctrl+k",
             front: "ctrl+shift+i",
             back: "ctrl+shift+k",
+        }
+    }
+
+    /**
+     * Returns the default properties configuration.
+     * @returns Default properties settings.
+     */
+    public static defaultProperties(): Properties {
+        return {
+            minZoom: 0.2,
+            maxZoom: 30,
+            zoomFactor: 1.05
+        }
+    }
+
+    /**
+     * Returns the default configuration for the renderer.
+     * @returns Default configuration settings.
+     */
+    public static defaultConfig(): RenderConfigurationProps {
+        return {
+            history: false,
+            pan: false,
+            zoom: false,
+            snap: false,
+            transform: false,
+            selection: false,
+            save: null,
+            keywords: RenderConfiguration.defaultKeyWords(),
+            properties: RenderConfiguration.defaultProperties()
         }
     }
 }

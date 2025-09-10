@@ -5,3 +5,8 @@ export { Rect } from "./library/instances/_shapes/Rect";
 export { Render } from "./library/Render";
 export { RenderCreator } from "./library/helpers/Render.creator";
 export { Text } from "./library/instances/_shapes/Text";
+
+// Features
+// Scroll Inside Render ⌛
+// Dimension in Transformer ✅
+// Radius in Transformer ⌛

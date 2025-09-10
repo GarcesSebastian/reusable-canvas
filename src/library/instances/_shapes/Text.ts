@@ -29,16 +29,16 @@ export type TextRawData = ShapeRawData & {
  */
 export interface IText extends IShape {
     text: string;
-    fontSize: number;
-    fontFamily: string;
-    fontWeight: string;
-    fontStyle: string;
-    textAlign: CanvasTextAlign;
-    color: string;
-    backgroundColor: string;
-    borderWidth: number;
-    borderColor: string;
-    padding: { top: number; right: number; bottom: number; left: number };
+    fontSize?: number;
+    fontFamily?: string;
+    fontWeight?: string;
+    fontStyle?: string;
+    textAlign?: CanvasTextAlign;
+    color?: string;
+    backgroundColor?: string;
+    borderWidth?: number;
+    borderColor?: string;
+    padding?: { top: number; right: number; bottom: number; left: number };
 }
 
 /**
@@ -115,16 +115,16 @@ export class Text extends Shape {
         super(DataText, render, "text", id);
 
         this.value = DataText.text;
-        this.fontSize = DataText.fontSize;
-        this.fontFamily = DataText.fontFamily;
-        this.fontWeight = DataText.fontWeight;
-        this.fontStyle = DataText.fontStyle;
-        this.textAlign = DataText.textAlign;
-        this.color = DataText.color;
-        this.backgroundColor = DataText.backgroundColor;
-        this.borderWidth = DataText.borderWidth;
-        this.borderColor = DataText.borderColor;
-        this.padding = DataText.padding;
+        this.fontSize = DataText.fontSize ?? 12;
+        this.fontFamily = DataText.fontFamily ?? "Arial";
+        this.fontWeight = DataText.fontWeight ?? "normal";
+        this.fontStyle = DataText.fontStyle ?? "normal";
+        this.textAlign = DataText.textAlign ?? "left";
+        this.color = DataText.color ?? "black";
+        this.backgroundColor = DataText.backgroundColor ?? "transparent";
+        this.borderWidth = DataText.borderWidth ?? 0;
+        this.borderColor = DataText.borderColor ?? "black";
+        this.padding = DataText.padding ?? { top: 0, right: 0, bottom: 0, left: 0 };
 
         this._width = 0;
         this._height = 0;
@@ -577,6 +577,15 @@ export class Text extends Shape {
     public set<K extends keyof IText>(key: K, value: IText[K]): this {
         (this[key as keyof this] as unknown as IText[K]) = value;
         return this;
+    }
+
+    /**
+     * Checks if the text has a specific property.
+     * @param key - The property key to check.
+     * @returns `true` if the text has the property, otherwise `false`.
+     */
+    public has(key: keyof IText): boolean {
+        return key in this;
     }
 
     /**

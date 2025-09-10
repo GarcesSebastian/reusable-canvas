@@ -258,7 +258,7 @@ export class Render extends RenderProvider {
         }
     
         if (this._isZooming && this.configuration.config.zoom) {
-            const zoomFactor = 1.05;
+            const zoomFactor = this.configuration.getProperties().zoomFactor;
             const mouse = this.mousePosition();
             const worldBefore = this.toWorldCoordinates(mouse);
     
@@ -267,7 +267,11 @@ export class Render extends RenderProvider {
             } else {
                 this._zoom /= zoomFactor;
             }
-    
+
+            const properties = this.configuration.getProperties();
+            if (this._zoom < properties.minZoom) this._zoom = properties.minZoom;
+            if (this._zoom > properties.maxZoom) this._zoom = properties.maxZoom;
+
             const worldAfter = this.toWorldCoordinates(mouse);
     
             this._globalPosition.x += (worldAfter.x - worldBefore.x) * this._zoom;
@@ -1191,7 +1195,7 @@ export class Render extends RenderProvider {
      * Loads a new configuration for the renderer.
      * @param config - Configuration object.
      */
-    public async loadConfiguration(config: RenderConfigurationProps): Promise<void> {
+    public async loadConfiguration(config: Partial<RenderConfigurationProps>): Promise<void> {
         this.configuration.load(config)
         
         if (this.configuration.config.save === "indexeddb") {
