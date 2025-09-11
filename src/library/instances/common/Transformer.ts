@@ -299,8 +299,10 @@ export class Transformer extends TransformerProvider {
 
         if (this._isDragging && this._activeNodeRadius && !this._isMovingSelection) {
             const nodePosition = this._getNodeCoordinates(this._activeNodeRadius);
+            const offset = this._render.getOffset();
+            const nodePositionScreen = nodePosition.sub(offset);
             
-            const deltaFromNode = currentMousePos.sub(nodePosition);
+            const deltaFromNode = currentMousePos.sub(nodePositionScreen);
             
             let expectedDirection = new Vector(0, 0);
             if (this._activeNodeRadius.includes("top")) {
@@ -319,7 +321,8 @@ export class Transformer extends TransformerProvider {
             const projectedDistance = deltaFromNode.x * expectedDirection.x + deltaFromNode.y * expectedDirection.y;
             
             const maxRadius = 50;
-            const sensitivity = 0.5;
+            const baseSensitivity = 0.5;
+            const sensitivity = baseSensitivity / this._render.zoom;
             let newRadius = Math.max(0, Math.min(maxRadius, projectedDistance * sensitivity));
             
             if (projectedDistance < 0) {
