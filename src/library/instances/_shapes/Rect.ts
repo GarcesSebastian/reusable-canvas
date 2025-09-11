@@ -201,7 +201,7 @@ export class Rect extends Shape {
 
         this._ctx.beginPath();
 
-        this._ctx.roundRect(0, 0, this.width, this.height, this.borderRadius / this._render.zoom);
+        this._ctx.roundRect(0, 0, this.width, this.height, this.borderRadius);
         this._ctx.fillStyle = this.color;
         this._ctx.fill();
 

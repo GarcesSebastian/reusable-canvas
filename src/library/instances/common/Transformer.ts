@@ -116,6 +116,8 @@ export class Transformer extends TransformerProvider {
     private _isMovingSelection: boolean = false;
     /** The currently active transformation node being dragged. */
     private _activeNode: string | null = null;
+    /** The currently active transformation node radius being dragged. */
+    private _activeNodeRadius: string | null = null;
     /** Last recorded mouse position for delta calculations. */
     private _lastMousePos: Vector = new Vector(0, 0);
     /** Original shape data before transformation for proper scaling calculations. */
@@ -224,6 +226,7 @@ export class Transformer extends TransformerProvider {
             this._isDragging = true;
             this._isMovingSelection = false;
             this._activeNode = activeNode;
+            this._activeNodeRadius = null;
             this._lastMousePos = this._render.worldPosition();
 
             this._originalData.clear();
@@ -255,10 +258,21 @@ export class Transformer extends TransformerProvider {
             return;
         }
 
+        const nodeRadiusActive = this._isClickedAnyNodeRadius();
+        if (nodeRadiusActive) {
+            this._isDragging = true;
+            this._isMovingSelection = false;
+            this._activeNode = null;
+            this._activeNodeRadius = nodeRadiusActive;
+            this._lastMousePos = this._render.worldPosition();
+            return;
+        }
+
         if (this._isClicked()) {
             this._isMovingSelection = true;
             this._isDragging = false;
             this._activeNode = null;
+            this._activeNodeRadius = null;
             this._lastMousePos = this._render.worldPosition();
             this.emit("movestart", { childs: Array.from(this._childs.values()) })
         }
@@ -283,6 +297,45 @@ export class Transformer extends TransformerProvider {
             return;
         }
 
+        if (this._isDragging && this._activeNodeRadius && !this._isMovingSelection) {
+            const nodePosition = this._getNodeCoordinates(this._activeNodeRadius);
+            
+            const deltaFromNode = currentMousePos.sub(nodePosition);
+            
+            let expectedDirection = new Vector(0, 0);
+            if (this._activeNodeRadius.includes("top")) {
+                expectedDirection.y = 1;
+            }
+            if (this._activeNodeRadius.includes("bottom")) {
+                expectedDirection.y = -1;
+            }
+            if (this._activeNodeRadius.includes("left")) {
+                expectedDirection.x = 1;
+            }
+            if (this._activeNodeRadius.includes("right")) {
+                expectedDirection.x = -1;
+            }
+            
+            const projectedDistance = deltaFromNode.x * expectedDirection.x + deltaFromNode.y * expectedDirection.y;
+            
+            const maxRadius = 50;
+            const sensitivity = 0.5;
+            let newRadius = Math.max(0, Math.min(maxRadius, projectedDistance * sensitivity));
+            
+            if (projectedDistance < 0) {
+                newRadius = 0;
+            } else if (projectedDistance > maxRadius / sensitivity) {
+                newRadius = maxRadius;
+            }
+
+            this._childs.forEach(child => {
+                if (child instanceof Rect || child instanceof Image) {
+                    child.borderRadius = newRadius;
+                }
+            })
+            return;
+        }
+
         if (this._isDragging && this._activeNode && !this._isMovingSelection) {
             const anchor = this._nodesBoxTemplate.get(this._activeNode)!;
             const anchorOpposite = new Vector(1 - anchor.x, 1 - anchor.y);
@@ -295,6 +348,7 @@ export class Transformer extends TransformerProvider {
 
             let newWidth = originalWidth;
             let newHeight = originalHeight;
+            
             if (this._activeNode.includes("right")) {
                 newWidth = originalWidth + totalDelta.x;
             } else if (this._activeNode.includes("left")) {
@@ -307,11 +361,11 @@ export class Transformer extends TransformerProvider {
                 newHeight = originalHeight - totalDelta.y;
             }
 
-            newWidth = Math.max(newWidth, minSize);
-            newHeight = Math.max(newHeight, minSize);
+            newWidth = Math.max(minSize, newWidth);
+            newHeight = Math.max(minSize, newHeight);
 
-            const scaleX = newWidth / originalWidth;
-            const scaleY = newHeight / originalHeight;
+            const scaleX = Math.max(minSize / originalWidth, newWidth / originalWidth);
+            const scaleY = Math.max(minSize / originalHeight, newHeight / originalHeight);
 
             const originalAnchorPoint = new Vector(
                 this._originalBounds.position.x + anchorOpposite.x * this._originalBounds.width,
@@ -454,7 +508,73 @@ export class Transformer extends TransformerProvider {
 
         return null;
     }
+
+    /**
+     * Checks if the mouse pointer is over any radius node.
+     * @returns The name of the clicked node, or null if no node was clicked.
+     * @private
+     */
+    private _isClickedAnyNodeRadius(): string | null {
+        if (this._childs.size === 0) return null;
+        const pointer = this._render.worldPosition();
+        const offset = this._render.getOffset();
+
+        for (const key of this._nodesBoxRadius.keys()) {
+            const nodePosition = this._getNodeCoordinates(key);
+            const nodePositionScreen = nodePosition.sub(offset);
+            const nodeX = nodePositionScreen.x - (this.nodeSize / this._render.zoom) / 2;
+            const nodeY = nodePositionScreen.y - (this.nodeSize / this._render.zoom) / 2;
+            const nodeWidth = this.nodeSize / this._render.zoom;
+            const nodeHeight = this.nodeSize / this._render.zoom;
+
+            if (
+                pointer.x >= nodeX &&
+                pointer.x <= nodeX + nodeWidth &&
+                pointer.y >= nodeY &&
+                pointer.y <= nodeY + nodeHeight
+            ) {
+                return key;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @internal
+     * Returns the coordinates of a transformation node based on the node name.
+     * @param node - The name of the node to retrieve coordinates for.
+     * @returns The coordinates of the node as a `Vector` object.
+     */
+    private _getNodeCoordinates(node: string): Vector {
+        const boxX = this._position.x - this.padding.left;
+        const boxY = this._position.y - this.padding.top;
+        const boxWidth = this._width + this.padding.left + this.padding.right;
+        const boxHeight = this._height + this.padding.top + this.padding.bottom;
+        const borderRadiusNode = Array.from(this.childs.values()).map((child) => {
+            if (child instanceof Rect || child instanceof Image) {
+                return child.borderRadius;
+            }
+            return 0;
+        })[0] ?? 0;
         
+        const baseMargin = 15 / this._render.zoom;
+        const radiusDisplacement = borderRadiusNode * 0.5;
+        const margin = baseMargin + radiusDisplacement;
+
+        switch (node) {
+            case "top-left":
+                return new Vector(boxX + margin, boxY + margin);
+            case "top-right":
+                return new Vector(boxX + boxWidth - margin, boxY + margin);
+            case "bottom-left":
+                return new Vector(boxX + margin, boxY + boxHeight - margin);
+            case "bottom-right":
+                return new Vector(boxX + boxWidth - margin, boxY + boxHeight - margin);
+            default:
+                return new Vector(boxX + margin, boxY + margin);
+        }
+    }
 
     /**
      * Calculates the bounding box that encompasses all selected shapes.
@@ -533,34 +653,8 @@ export class Transformer extends TransformerProvider {
      */
     private _calculateNodesBoxRadius(): void {
         this._nodesBoxRadius.clear();
-
-        const boxX = this._position.x - this.padding.left;
-        const boxY = this._position.y - this.padding.top;
-        const boxWidth = this._width + this.padding.left + this.padding.right;
-        const boxHeight = this._height + this.padding.top + this.padding.bottom;
-        const margin = 15;
-
-        this._nodesBoxTemplateRadius.forEach((node: Vector, key: string) => {
-            let umbralX = margin;
-            let umbralY = margin;
-            
-            if (key === "top-left") {
-                umbralX = umbralX;
-                umbralY = umbralY;
-            } else if (key === "top-right") {
-                umbralX = -umbralX;
-                umbralY = umbralY;
-            } else if (key === "bottom-left") {
-                umbralX = umbralX;
-                umbralY = -umbralY;
-            } else if (key === "bottom-right") {
-                umbralX = -umbralX;
-                umbralY = -umbralY;
-            }
-
-            const posX = boxX + umbralX / this._render.zoom + node.x * boxWidth;
-            const posY = boxY + umbralY / this._render.zoom + node.y * boxHeight;
-            this._nodesBoxRadius.set(key, new Vector(posX, posY));
+        this._nodesBoxTemplateRadius.forEach((_: Vector, key: string) => {
+            this._nodesBoxRadius.set(key, this._getNodeCoordinates(key));
         })
     }
 
@@ -681,7 +775,7 @@ export class Transformer extends TransformerProvider {
         const child = this._childs.values().next().value;
         const widthScaled = this._width * this._render.zoom;
         const heightScaled = this._height * this._render.zoom;
-        if (this._childs.size !== 1 || this._isHidden || !child?.has("borderRadius" as keyof IShape) || widthScaled <= this._minWidth || heightScaled <= this._minHeight) return;
+        if (this._childs.size !== 1 || this._isHidden || !child?.has("borderRadius" as keyof IShape) || widthScaled < this._minWidth || heightScaled < this._minHeight) return;
         
         const offset = this._render.getOffset();
         const radius = 5 / this._render.zoom;
