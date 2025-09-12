@@ -269,8 +269,8 @@ export class Render extends RenderProvider {
             }
 
             const properties = this.configuration.getProperties();
-            if (this._zoom < properties.minZoom) this._zoom = properties.minZoom;
-            if (this._zoom > properties.maxZoom) this._zoom = properties.maxZoom;
+            if (properties.minZoom && this._zoom < properties.minZoom) this._zoom = properties.minZoom;
+            if (properties.maxZoom && this._zoom > properties.maxZoom) this._zoom = properties.maxZoom;
 
             const worldAfter = this.toWorldCoordinates(mouse);
     
@@ -849,6 +849,8 @@ export class Render extends RenderProvider {
      * @param properties - Object containing the properties to set.
      */
     public setProperties(props: Partial<RenderProperties>) {
+        if (!props) return;
+        
         if (props.zoom !== undefined) {
             this._zoom = props.zoom;
         }
@@ -867,6 +869,13 @@ export class Render extends RenderProvider {
     public preExport(): void {
         this.transformer.hide();
         this.disallowFps();
+        this.snapSmart.unbind();
+        this.selection._isSelecting = false;
+        this.selection._startPosition = Vector.zero;
+        this.selection._endPosition = Vector.zero;
+        this.selection._width = 0;
+        this.selection._height = 0;
+        this._render();
     }
 
     /**

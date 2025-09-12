@@ -100,6 +100,10 @@ export class Transformer extends TransformerProvider {
     private _minWidth: number = 100;
     /** Minimum height of the transformer boundary. */
     private _minHeight: number = 100;
+    /** Minimum radius for transformation nodes. */
+    private _minRadius: number = 0;
+    /** Maximum radius for transformation nodes. */
+    private _maxRadius: number = 50;
 
     /** Template positions for transformation nodes (0-1 normalized coordinates). */
     private _nodesBoxTemplate: Map<string, Vector> = new Map();
@@ -320,15 +324,14 @@ export class Transformer extends TransformerProvider {
             
             const projectedDistance = deltaFromNode.x * expectedDirection.x + deltaFromNode.y * expectedDirection.y;
             
-            const maxRadius = 50;
             const baseSensitivity = 0.5;
             const sensitivity = baseSensitivity / this._render.zoom;
-            let newRadius = Math.max(0, Math.min(maxRadius, projectedDistance * sensitivity));
+            let newRadius = Math.max(this._minRadius, Math.min(this._maxRadius, projectedDistance * sensitivity));
             
             if (projectedDistance < 0) {
-                newRadius = 0;
-            } else if (projectedDistance > maxRadius / sensitivity) {
-                newRadius = maxRadius;
+                newRadius = this._minRadius;
+            } else if (projectedDistance > this._maxRadius / sensitivity) {
+                newRadius = this._maxRadius;
             }
 
             this._childs.forEach(child => {

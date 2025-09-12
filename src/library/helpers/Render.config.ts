@@ -30,8 +30,8 @@ export interface Keys {
 }
 
 export interface Properties {
-    minZoom: number,
-    maxZoom: number,
+    minZoom?: number,
+    maxZoom?: number,
     zoomFactor: number,
 }
 
@@ -509,8 +509,6 @@ export class RenderConfiguration {
      */
     public static defaultProperties(): Properties {
         return {
-            minZoom: 0.2,
-            maxZoom: 30,
             zoomFactor: 1.05
         }
     }

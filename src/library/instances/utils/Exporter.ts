@@ -383,14 +383,7 @@ export class Exporter {
 
         const target = this._render.snapSmart.getTarget();
         this._render.preExport();
-        this._render.snapSmart.unbind();
-        this._render.selection._isSelecting = false;
-        this._render.selection._startPosition = Vector.zero;
-        this._render.selection._endPosition = Vector.zero;
-        this._render.selection._width = 0;
-        this._render.selection._height = 0;
         this.hideExportCut();
-        this._render._render();
         await new Promise(resolve => requestAnimationFrame(resolve));
 
         try {
@@ -420,7 +413,7 @@ export class Exporter {
             ctx.setTransform(finalScale, 0, 0, finalScale, 0, 0);
 
             if (format === "jpeg" || format === "webp") {
-                ctx.fillStyle = "white";
+                ctx.fillStyle = this._render.canvas.style.backgroundColor ?? "black";
                 ctx.fillRect(0, 0, cropWidth, cropHeight);
             }
 
